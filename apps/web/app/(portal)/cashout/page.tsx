@@ -120,8 +120,8 @@ export default function CashoutPage(){
     <div className="section-heading"><h2>Withdrawal History</h2><span>{withdrawals.length} requests</span></div>
     <div className="panel">
       <table className="table">
-        <thead><tr><th>Method</th><th>Coins</th><th>Status</th><th>Requested</th><th>Reason</th></tr></thead>
-        <tbody>{withdrawals.length?withdrawals.map(w=><tr key={w.id}><td>{w.method_key}</td><td>{formatPoints(w.points)}</td><td><span className={'status-pill '+(w.status==='paid'?'available':'review')}>{w.status}</span></td><td>{new Date(w.requested_at).toLocaleDateString()}</td><td>{w.rejection_reason||'—'}</td></tr>):<tr><td colSpan={5} className="center muted" style={{padding:28}}>No withdrawals yet.</td></tr>}</tbody>
+        <thead><tr><th>Method</th><th>Requested</th><th>Fee</th><th>Net</th><th>Status</th><th>Date</th><th>Reason</th></tr></thead>
+        <tbody>{withdrawals.length?withdrawals.map(w=><tr key={w.id}><td>{w.method_key}</td><td>{formatPoints(w.points)}</td><td>{formatPoints(w.fee_points||0)}</td><td>{formatPoints(w.net_points??w.points)}</td><td><span className={'status-pill '+(w.status==='paid'?'available':'review')}>{w.status}</span></td><td>{new Date(w.requested_at).toLocaleDateString()}</td><td>{w.rejection_reason||'—'}</td></tr>):<tr><td colSpan={7} className="center muted" style={{padding:28}}>No withdrawals yet.</td></tr>}</tbody>
       </table>
     </div>
 
