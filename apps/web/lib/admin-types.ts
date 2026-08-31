@@ -21,6 +21,7 @@ export type AdminUser = {
   created_at:string;
   available_points:string|number;
   held_points:string|number;
+  debt_points:string|number;
   lifetime_earned_points:string|number;
 };
 
