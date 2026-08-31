@@ -8,20 +8,6 @@ on:
 jobs:
   api-build:
     runs-on: blacksmith-2vcpu-ubuntu-2404
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: rewards_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d rewards_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/rewards_test
@@ -38,6 +24,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Start PostgreSQL
+        run: |
+          docker run -d --name rewards-postgres             -e POSTGRES_USER=postgres             -e POSTGRES_PASSWORD=postgres             -e POSTGRES_DB=rewards_test             -p 5432:5432             postgres:16
+          for i in {1..30}; do
+            if docker exec rewards-postgres pg_isready -U postgres -d rewards_test; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs rewards-postgres
+          exit 1
       - run: npm install
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
