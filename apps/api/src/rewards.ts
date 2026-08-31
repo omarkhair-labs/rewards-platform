@@ -176,10 +176,10 @@ export const Rewards = {
     return updated.rows[0];
   },
 
-  verifyGenericSignature(secret: string, txId: string, userId: string, reward: string, signature: string) {
+  verifyGenericSignature(secret: string, txId: string, userId: string, reward: string, status: string, signature: string) {
     const expected = crypto
       .createHmac('sha256', secret)
-      .update(`${txId}:${userId}:${reward}`)
+      .update(`${txId}:${userId}:${reward}:${status}`)
       .digest('hex');
 
     const left = Buffer.from(expected);
