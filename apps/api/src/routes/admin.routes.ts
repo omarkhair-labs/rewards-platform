@@ -58,7 +58,7 @@ router.get('/users', async (req, res) => {
   let sql = `
     SELECT u.id,u.username,u.email,u.role,u.status,u.level,u.rank,u.is_premium,u.premium_expires_at,
            u.withdrawal_locked_at,u.withdrawal_lock_reason,u.created_at,
-           w.available_points,w.held_points,w.lifetime_earned_points
+           w.available_points,w.held_points,w.debt_points,w.lifetime_earned_points
     FROM users u LEFT JOIN wallet_accounts w ON w.user_id=u.id
   `;
   if (q) {
