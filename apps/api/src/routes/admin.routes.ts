@@ -279,45 +279,6 @@ router.patch('/tasks/:id', async (req: AuthedRequest, res) => {
   res.json(updated);
 });
 
-router.patch('/providers/:id', async (req: AuthedRequest, res) => {
-  const input = providerSchema.partial().parse(req.body);
-  const providerId = String(req.params.id);
-  const updated = await tx(async client => {
-    const current = await client.query('SELECT * FROM providers WHERE id=$1 FOR UPDATE', [providerId]);
-    if (!current.rows[0]) throw new HttpError(404, 'Provider not found');
-    const before = current.rows[0];
-
-    const mergedPublic = input.publicConfig !== undefined ? input.publicConfig : before.public_config;
-    const mergedSecret = input.secretConfig !== undefined ? input.secretConfig : before.secret_config;
-
-    const r = await client.query(
-      `UPDATE providers SET
-       slug=$1,name=$2,kind=$3,wall_url=$4,api_base_url=$5,public_config=$6,secret_config=$7,
-       signature_mode=$8,is_enabled=$9,updated_at=NOW()
-       WHERE id=$10
-       RETURNING id,slug,name,kind,wall_url,api_base_url,public_config,signature_mode,is_enabled,created_at,updated_at`,
-      [
-        input.slug ?? before.slug,
-        input.name ?? before.name,
-        input.kind ?? before.kind,
-        input.wallUrl !== undefined ? input.wallUrl || null : before.wall_url,
-        input.apiBaseUrl !== undefined ? input.apiBaseUrl || null : before.api_base_url,
-        JSON.stringify(mergedPublic),
-        JSON.stringify(mergedSecret),
-        input.signatureMode ?? before.signature_mode,
-        input.isEnabled ?? before.is_enabled,
-        providerId
-      ]
-    );
-    await audit(client, req.auth!.userId, 'provider.update', 'provider', providerId, {
-      ...input,
-      ...(input.secretConfig !== undefined ? { secretConfig: '[redacted]' } : {})
-    });
-    return r.rows[0];
-  });
-  res.json(updated);
-});
-
 router.get('/task-submissions', async (req, res) => {
   const status = typeof req.query.status === 'string' ? req.query.status : null;
   const params: unknown[] = [];
@@ -518,6 +479,46 @@ router.post('/providers', async (req: AuthedRequest, res) => {
   });
   res.status(201).json(provider);
 });
+
+router.patch('/providers/:id', async (req: AuthedRequest, res) => {
+  const input = providerSchema.partial().parse(req.body);
+  const providerId = String(req.params.id);
+  const updated = await tx(async client => {
+    const current = await client.query('SELECT * FROM providers WHERE id=$1 FOR UPDATE', [providerId]);
+    if (!current.rows[0]) throw new HttpError(404, 'Provider not found');
+    const before = current.rows[0];
+
+    const mergedPublic = input.publicConfig !== undefined ? input.publicConfig : before.public_config;
+    const mergedSecret = input.secretConfig !== undefined ? input.secretConfig : before.secret_config;
+
+    const r = await client.query(
+      `UPDATE providers SET
+       slug=$1,name=$2,kind=$3,wall_url=$4,api_base_url=$5,public_config=$6,secret_config=$7,
+       signature_mode=$8,is_enabled=$9,updated_at=NOW()
+       WHERE id=$10
+       RETURNING id,slug,name,kind,wall_url,api_base_url,public_config,signature_mode,is_enabled,created_at,updated_at`,
+      [
+        input.slug ?? before.slug,
+        input.name ?? before.name,
+        input.kind ?? before.kind,
+        input.wallUrl !== undefined ? input.wallUrl || null : before.wall_url,
+        input.apiBaseUrl !== undefined ? input.apiBaseUrl || null : before.api_base_url,
+        JSON.stringify(mergedPublic),
+        JSON.stringify(mergedSecret),
+        input.signatureMode ?? before.signature_mode,
+        input.isEnabled ?? before.is_enabled,
+        providerId
+      ]
+    );
+    await audit(client, req.auth!.userId, 'provider.update', 'provider', providerId, {
+      ...input,
+      ...(input.secretConfig !== undefined ? { secretConfig: '[redacted]' } : {})
+    });
+    return r.rows[0];
+  });
+  res.json(updated);
+});
+
 
 router.get('/fraud-events', async (_req, res) => {
   const r = await pool.query(
