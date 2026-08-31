@@ -55,6 +55,7 @@ async function applyReferralCommission(client: pg.PoolClient, rewardEvent: any, 
 export const Rewards = {
   async credit(client: pg.PoolClient, input: CreditInput) {
     if (input.rewardPoints <= 0n) throw new HttpError(400, 'Reward must be positive');
+    if (input.rewardPoints > env.MAX_SINGLE_REWARD_POINTS) throw new HttpError(400, 'Reward exceeds platform maximum');
 
     const prior = await client.query(
       'SELECT * FROM reward_events WHERE idempotency_key=$1',
