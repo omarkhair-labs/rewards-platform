@@ -3,8 +3,10 @@
   "private": true,
   "workspaces": ["apps/*"],
   "scripts": {
-    "dev": "npm --workspace @rewards/api run dev",
-    "build": "npm --workspace @rewards/api run build",
-    "start": "npm --workspace @rewards/api run start"
+    "dev:api": "npm --workspace @rewards/api run dev",
+    "dev:web": "npm --workspace @rewards/web run dev",
+    "build": "npm --workspace @rewards/api run build && npm --workspace @rewards/web run build",
+    "start:api": "npm --workspace @rewards/api run start",
+    "start:web": "npm --workspace @rewards/web run start"
   }
 }
