@@ -101,9 +101,7 @@ export const Rewards = {
       }
     });
 
-    if (input.eventType !== 'referral') {
-      await applyReferralCommission(client, row, input.userId, input.rewardPoints);
-    }
+    await applyReferralCommission(client, row, input.userId, input.rewardPoints);
 
     await client.query(
       `INSERT INTO notifications(user_id,type,title,message)
