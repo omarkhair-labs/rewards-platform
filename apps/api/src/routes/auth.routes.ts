@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { pool, tx } from '../db.js';
@@ -7,6 +8,23 @@ import { HttpError } from '../http.js';
 
 const router = Router();
 
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { error: 'Too many failed login attempts. Try again later.' }
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 8,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many registration attempts. Try again later.' }
+});
+
 const registerSchema = z.object({
   username: z.string().trim().min(3).max(40),
   email: z.string().email().transform(v => v.trim().toLowerCase()),
@@ -14,7 +32,7 @@ const registerSchema = z.object({
   referralCode: z.string().trim().max(64).optional()
 });
 
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   const input = registerSchema.parse(req.body);
 
   const user = await tx(async client => {
@@ -60,7 +78,7 @@ const loginSchema = z.object({
   password: z.string().min(1)
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const input = loginSchema.parse(req.body);
   const result = await pool.query('SELECT * FROM users WHERE email=$1', [input.email]);
   const user = result.rows[0];
