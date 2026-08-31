@@ -2,12 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main, build/**]
+    branches: [main, build/**, feature/**]
   pull_request:
 
 jobs:
   api-build:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     services:
       postgres:
         image: postgres:16
