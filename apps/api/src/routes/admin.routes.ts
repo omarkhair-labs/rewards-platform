@@ -5,6 +5,7 @@ import { requireRole, type AuthedRequest } from '../auth.js';
 import { HttpError } from '../http.js';
 import { Rewards } from '../rewards.js';
 import { Wallet } from '../wallet.js';
+import { env } from '../config/env.js';
 
 const router = Router();
 router.use(requireRole('admin','moderator'));
@@ -124,7 +125,7 @@ const taskSchema = z.object({
   title: z.string().trim().min(2).max(200),
   description: z.string().trim().max(5000).default(''),
   category: z.string().trim().min(2).max(80),
-  rewardPoints: z.coerce.bigint().positive(),
+  rewardPoints: z.coerce.bigint().positive().max(env.MAX_SINGLE_REWARD_POINTS),
   imageUrl: httpUrl(2000).optional(),
   proofType: z.enum(['url','text','file','none']).default('url'),
   instructions: z.array(z.unknown()).default([]),
@@ -164,7 +165,7 @@ const offerSchema = z.object({
   title: z.string().trim().min(2).max(200),
   description: z.string().trim().max(5000).default(''),
   category: z.string().trim().min(2).max(80),
-  rewardPoints: z.coerce.bigint().min(0n),
+  rewardPoints: z.coerce.bigint().min(0n).max(env.MAX_SINGLE_REWARD_POINTS),
   imageUrl: httpUrl(2000).optional().nullable(),
   landingUrl: httpUrl(4000).optional().nullable(),
   difficulty: z.string().trim().max(50).optional().nullable(),
@@ -645,7 +646,7 @@ const watchCampaignSchema = z.object({
   title:z.string().trim().min(2).max(200),
   mediaUrl:httpUrl(4000),
   durationSeconds:z.coerce.number().int().min(5).max(86400),
-  rewardPoints:z.coerce.bigint().positive(),
+  rewardPoints:z.coerce.bigint().positive().max(env.MAX_SINGLE_REWARD_POINTS),
   dailyLimit:z.coerce.number().int().positive().max(1000).default(1),
   isActive:z.boolean().default(true)
 });
