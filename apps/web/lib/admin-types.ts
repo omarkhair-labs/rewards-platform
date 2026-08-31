@@ -22,8 +22,6 @@ export type AdminUser = {
   available_points:string|number;
   held_points:string|number;
   lifetime_earned_points:string|number;
-  withdrawal_locked_at?:string|null;
-  withdrawal_lock_reason?:string|null;
 };
 
 export type AdminOffer = {
