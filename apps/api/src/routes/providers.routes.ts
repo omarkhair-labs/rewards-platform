@@ -124,6 +124,7 @@ router.post('/:slug/postback', async (req, res) => {
     input.transactionId,
     input.userId.toString(),
     input.rewardPoints.toString(),
+    input.status,
     input.signature
   )) {
     throw new HttpError(403, 'Invalid provider signature');
