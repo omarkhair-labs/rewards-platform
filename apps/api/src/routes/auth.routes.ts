@@ -85,7 +85,20 @@ router.post('/login', loginLimiter, async (req, res) => {
   const result = await pool.query('SELECT * FROM users WHERE email=$1', [input.email]);
   const user = result.rows[0];
 
-  if (!user || !(await verifyPassword(user.password_hash, input.password))) {
+  const passwordValid = user ? await verifyPassword(user.password_hash, input.password) : false;
+  if (!user || !passwordValid) {
+    if (user) {
+      await pool.query(
+        `INSERT INTO fraud_events(user_id,event_type,severity,ip_address,user_agent,metadata)
+         VALUES ($1,'login_failed','medium',$2,$3,$4)`,
+        [
+          user.id,
+          req.ip || null,
+          req.headers['user-agent'] || null,
+          JSON.stringify({ reason: 'invalid_password' })
+        ]
+      );
+    }
     throw new HttpError(401, 'Invalid email or password');
   }
   if (user.status !== 'active') throw new HttpError(403, 'Account unavailable');
