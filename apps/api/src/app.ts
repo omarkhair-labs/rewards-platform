@@ -11,6 +11,7 @@ import referralsRoutes from './routes/referrals.routes.js';
 import surveysRoutes from './routes/surveys.routes.js';
 import withdrawalsRoutes from './routes/withdrawals.routes.js';
 import providersRoutes from './routes/providers.routes.js';
+import officialPostbackRoutes from './routes/official-postbacks.routes.js';
 import watchRoutes from './routes/watch.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 
@@ -19,13 +20,19 @@ export const app = express();
 app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cors({ origin: env.APP_ORIGIN, credentials: true }));
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({
+  limit: '1mb',
+  verify: (req: any, _res, buf) => {
+    req.rawBody = Buffer.from(buf);
+  }
+}));
 app.use(express.urlencoded({ extended: false }));
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
   standardHeaders: 'draft-7',
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: req => req.path.startsWith('/api/postbacks/')
 }));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
@@ -37,6 +44,7 @@ app.use('/api/referrals', referralsRoutes);
 app.use('/api/surveys', surveysRoutes);
 app.use('/api/withdrawals', withdrawalsRoutes);
 app.use('/api/providers', providersRoutes);
+app.use('/api/postbacks', officialPostbackRoutes);
 app.use('/api/watch', watchRoutes);
 app.use('/api/admin', adminRoutes);
 
