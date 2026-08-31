@@ -34,11 +34,22 @@ router.get('/dashboard', async (_req, res) => {
   });
 });
 
+
+router.get('/level-rules', async (_req,res)=>{
+  const r=await pool.query(
+    `SELECT level,rank,min_lifetime_points,created_at
+     FROM level_rules
+     ORDER BY level ASC`
+  );
+  res.json(r.rows);
+});
+
 router.get('/users', async (req, res) => {
   const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   const params: unknown[] = [];
   let sql = `
-    SELECT u.id,u.username,u.email,u.role,u.status,u.level,u.rank,u.is_premium,u.created_at,
+    SELECT u.id,u.username,u.email,u.role,u.status,u.level,u.rank,u.is_premium,u.premium_expires_at,
+           u.withdrawal_locked_at,u.withdrawal_lock_reason,u.created_at,
            w.available_points,w.held_points,w.lifetime_earned_points
     FROM users u LEFT JOIN wallet_accounts w ON w.user_id=u.id
   `;
