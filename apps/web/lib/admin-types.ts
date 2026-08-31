@@ -85,6 +85,9 @@ export type AdminWithdrawal = {
   method_key:string;
   account_snapshot:Record<string,unknown>;
   points:string|number;
+  fee_bps?:number;
+  fee_points?:string|number;
+  net_points?:string|number;
   status:'pending'|'in_review'|'processing'|'paid'|'rejected'|'cancelled'|'failed';
   provider_reference?:string|null;
   rejection_reason?:string|null;
