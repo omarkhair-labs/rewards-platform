@@ -23,6 +23,7 @@ Production-oriented foundation for a GPT / rewards platform with CovenCash-style
 - Notifications
 - Admin users / offers / tasks / proofs / withdrawals / providers / watch campaigns / fraud / audit
 - S3-compatible proof file uploads
+- Database-backed payout method catalog with minimums, fees and account-field schemas
 - Automatic level/rank progression
 - Time-bounded or lifetime premium grants
 
@@ -53,7 +54,7 @@ The implementation uses original code and branding while matching the requested 
 
 ## Next build lanes
 
-1. Payout method catalog + automated adapters where provider credentials exist.
+1. Automated payout adapters where provider credentials exist.
 2. Fraud hardening and security rules.
 3. E2E tests and database integration tests.
 4. Demo/seed environment and admin bootstrap.
@@ -64,3 +65,8 @@ The implementation uses original code and branding while matching the requested 
 ## Proof file storage
 
 File proof tasks use an S3-compatible object store (Cloudflare R2, S3, MinIO, etc.). Configure the STORAGE_* variables from `apps/api/.env.example`. Files are uploaded directly from the browser using a five-minute signed PUT URL and task submissions only accept file URLs under that user's proof storage prefix.
+
+
+## Payout catalog
+
+Cashout methods are no longer hardcoded in the web UI. Enabled methods are stored in `payout_method_catalog`, including account field requirements, minimum points, fee basis points, operator/API mode and ordering. Each withdrawal snapshots its fee and net points so later catalog changes cannot rewrite historical payout economics.
