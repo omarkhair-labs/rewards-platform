@@ -4,7 +4,6 @@ name: CI
 on:
   push:
     branches: [main, build/**, feature/**]
-  pull_request:
 
 jobs:
   api-build:
