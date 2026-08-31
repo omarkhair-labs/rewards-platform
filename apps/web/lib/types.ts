@@ -81,6 +81,9 @@ export type Withdrawal = {
   id: string | number;
   method_key: string;
   points: string | number;
+  fee_bps?: number;
+  fee_points?: string | number;
+  net_points?: string | number;
   status: string;
   requested_at: string;
   rejection_reason?: string | null;
