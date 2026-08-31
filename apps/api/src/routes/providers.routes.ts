@@ -5,6 +5,7 @@ import { pool, tx } from '../db.js';
 import { requireAuth, type AuthedRequest } from '../auth.js';
 import { HttpError } from '../http.js';
 import { Rewards } from '../rewards.js';
+import { assertHttpUrl } from '../security.js';
 
 const router = Router();
 
@@ -85,6 +86,7 @@ router.post('/offers/:id/click', requireAuth, async (req: AuthedRequest, res) =>
   }
 
   if (!target) throw new HttpError(409, 'Offer provider URL is not configured');
+  target = assertHttpUrl(target, 'Offer URL');
   res.json({ url: target, clickToken });
 });
 
