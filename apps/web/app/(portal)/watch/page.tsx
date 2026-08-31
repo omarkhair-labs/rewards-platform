@@ -17,6 +17,7 @@ type ActiveSession={
   campaignId:string;
   sessionId:string;
   endsAt:number;
+  durationSeconds:number;
   mediaUrl:string;
 };
 
@@ -50,7 +51,7 @@ export default function WatchPage(){
     setWorking(true);setError('');setSuccess('');
     try{
       const result=await apiFetch<{sessionId:string;minimumSeconds:number}>('/api/watch/'+campaign.id+'/start',{method:'POST'});
-      setActive({campaignId:campaign.id,sessionId:result.sessionId,endsAt:Date.now()+result.minimumSeconds*1000,mediaUrl:campaign.media_url});
+      setActive({campaignId:campaign.id,sessionId:result.sessionId,endsAt:Date.now()+result.minimumSeconds*1000,durationSeconds:result.minimumSeconds,mediaUrl:campaign.media_url});
       setNow(Date.now());
       window.open(campaign.media_url,'_blank','noopener,noreferrer');
     }catch(err){setError(err instanceof Error?err.message:'Unable to start campaign');}
@@ -80,7 +81,7 @@ export default function WatchPage(){
 
     {active&&<div className="panel mt">
       <div className="section-heading"><h2>Active Watch Session</h2><span>{remaining>0?remaining+' seconds remaining':'Ready to complete'}</span></div>
-      <div className="progress-track"><div className="progress-fill" style={{width:(remaining===0?100:Math.max(0,100-(remaining/Math.max(1,Math.ceil((active.endsAt-(active.endsAt-60000))/1000)))*100))+'%'}}/></div>
+      <div className="progress-track"><div className="progress-fill" style={{width:(remaining===0?100:Math.max(0,100-(remaining/Math.max(1,active.durationSeconds))*100))+'%'}}/></div>
       <div className="admin-actions mt">
         <a className="secondary-button" href={active.mediaUrl} target="_blank" rel="noreferrer">Reopen Media</a>
         <button disabled={working||remaining>0} className="primary-button" onClick={()=>void complete()}>{working?'Checking...':remaining>0?'Wait '+remaining+'s':'Claim Reward'}</button>
