@@ -1,0 +1,12 @@
+{
+  "name": "rewards-platform",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev:api": "npm --workspace @rewards/api run dev",
+    "dev:web": "npm --workspace @rewards/web run dev",
+    "build": "npm --workspace @rewards/api run build && npm --workspace @rewards/web run build",
+    "start:api": "npm --workspace @rewards/api run start",
+    "start:web": "npm --workspace @rewards/web run start"
+  }
+}
