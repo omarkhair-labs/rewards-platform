@@ -1,11 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   BadgeDollarSign, Boxes, ClipboardCheck, CircleDollarSign, LayoutDashboard,
   ListTodo, LogOut, Settings, ShieldCheck, UserRound, UsersRound
 } from 'lucide-react';
+import { apiFetch, clearToken, formatPoints, getToken } from '@/lib/api';
+import type { Me } from '@/lib/types';
 
 const nav = [
   { href:'/dashboard', label:'Dashboard', icon:LayoutDashboard },
@@ -19,6 +22,52 @@ const nav = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [me,setMe] = useState<Me|null>(null);
+  const [loading,setLoading] = useState(true);
+
+  useEffect(()=>{
+    let active = true;
+
+    async function load(){
+      if (!getToken()) {
+        router.replace('/login');
+        return;
+      }
+      try {
+        const user = await apiFetch<Me>('/api/auth/me');
+        if (active) setMe(user);
+      } catch {
+        clearToken();
+        router.replace('/login');
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void load();
+    return ()=>{ active=false; };
+  },[router]);
+
+  function logout(){
+    clearToken();
+    router.replace('/login');
+  }
+
+  const username = me?.username || 'Member';
+  const initial = username.slice(0,1).toUpperCase();
+  const rank = me?.rank || 'Bronze';
+  const level = me?.level || 1;
+  const isPremium = Boolean(me?.is_premium);
+  const balance = formatPoints(me?.available_points || 0);
+
+  if (loading || !me) {
+    return <div className="app-boot">
+      <div className="brand-mark">R</div>
+      <div className="loading-spinner" />
+      <span>Loading your rewards account...</span>
+    </div>;
+  }
 
   return (
     <div className="app-shell">
@@ -32,17 +81,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="member-card">
-          <div className="avatar">M</div>
+          <div className="avatar">{initial}</div>
           <div className="member-copy">
-            <b>Mostafa</b>
-            <span>Bronze Member</span>
+            <b>{username}</b>
+            <span>{rank} · Level {level}</span>
           </div>
-          <span className="premium-pill">FREE</span>
+          <span className="premium-pill">{isPremium ? 'PREMIUM' : 'FREE'}</span>
         </div>
 
         <div className="side-balance">
           <span>Balance</span>
-          <strong>0 Coins</strong>
+          <strong>{balance} Coins</strong>
         </div>
 
         <nav className="side-nav">
@@ -55,12 +104,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="sidebar-bottom">
-          <div className="affiliate-box">
+          <Link className="affiliate-box" href="/affiliates">
             <BadgeDollarSign size={17} />
             <div><b>Affiliate Program</b><span>Earn from referrals</span></div>
-          </div>
-          <button className="ghost-button"><Settings size={15}/> Settings</button>
-          <button className="ghost-button"><LogOut size={15}/> Logout</button>
+          </Link>
+          <Link className="ghost-button" href="/profile"><Settings size={15}/> Settings</Link>
+          <button className="ghost-button" onClick={logout}><LogOut size={15}/> Logout</button>
         </div>
       </aside>
 
@@ -72,8 +121,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="top-actions">
             <div className="security-chip"><ShieldCheck size={15}/> Secure account</div>
-            <button className="icon-button" aria-label="settings"><Settings size={16}/></button>
-            <div className="mini-avatar">M</div>
+            <Link className="icon-button icon-link" aria-label="settings" href="/profile"><Settings size={16}/></Link>
+            <div className="mini-avatar">{initial}</div>
           </div>
         </header>
         <div className="page-wrap">{children}</div>
