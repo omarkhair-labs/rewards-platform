@@ -12,7 +12,11 @@ router.get('/', requireAuth, async (req: AuthedRequest, res) => {
     `SELECT t.*,
             EXISTS(
               SELECT 1 FROM task_submissions s
-              WHERE s.task_id=t.id AND s.user_id=$1 AND s.status IN ('pending','in_review','approved')
+              WHERE s.task_id=t.id AND s.user_id=$1
+                AND (
+                  s.status IN ('pending','in_review')
+                  OR (t.is_repeatable=FALSE AND s.status='approved')
+                )
             ) AS already_submitted
      FROM tasks t
      WHERE t.is_active=TRUE
