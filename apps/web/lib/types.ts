@@ -15,6 +15,7 @@ export type Me = {
   premium_expires_at?: string | null;
   available_points?: string | number;
   held_points?: string | number;
+  debt_points?: string | number;
   lifetime_earned_points?: string | number;
 };
 
@@ -22,6 +23,7 @@ export type Dashboard = {
   wallet: {
     available_points: string | number;
     held_points: string | number;
+    debt_points?: string | number;
     lifetime_earned_points: string | number;
   };
   earnings: {
