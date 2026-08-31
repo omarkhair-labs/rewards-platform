@@ -134,6 +134,190 @@ router.post('/tasks', async (req: AuthedRequest, res) => {
   res.status(201).json(task);
 });
 
+
+const offerSchema = z.object({
+  providerId: z.coerce.bigint().optional().nullable(),
+  externalId: z.string().trim().max(255).optional().nullable(),
+  title: z.string().trim().min(2).max(200),
+  description: z.string().trim().max(5000).default(''),
+  category: z.string().trim().min(2).max(80),
+  rewardPoints: z.coerce.bigint().min(0n),
+  imageUrl: z.string().url().max(2000).optional().nullable(),
+  landingUrl: z.string().url().max(4000).optional().nullable(),
+  difficulty: z.string().trim().max(50).optional().nullable(),
+  estimatedMinutes: z.coerce.number().int().positive().optional().nullable(),
+  allowedCountries: z.array(z.string().trim().min(2).max(3)).default([]),
+  requirements: z.array(z.unknown()).default([]),
+  isFeatured: z.boolean().default(false),
+  isActive: z.boolean().default(true),
+  startsAt: z.string().datetime().optional().nullable(),
+  endsAt: z.string().datetime().optional().nullable()
+});
+
+const offerPatchSchema = offerSchema.partial();
+
+router.get('/offers', async (_req, res) => {
+  const r = await pool.query(
+    `SELECT o.*,p.slug provider_slug,p.name provider_name
+     FROM offers o
+     LEFT JOIN providers p ON p.id=o.provider_id
+     ORDER BY o.created_at DESC`
+  );
+  res.json(r.rows);
+});
+
+router.post('/offers', async (req: AuthedRequest, res) => {
+  const input = offerSchema.parse(req.body);
+  const created = await tx(async client => {
+    const r = await client.query(
+      `INSERT INTO offers
+       (provider_id,external_id,title,description,category,reward_points,image_url,landing_url,difficulty,estimated_minutes,
+        allowed_countries,requirements,is_featured,is_active,starts_at,ends_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       RETURNING *`,
+      [
+        input.providerId?.toString() || null,
+        input.externalId || null,
+        input.title,
+        input.description,
+        input.category,
+        input.rewardPoints.toString(),
+        input.imageUrl || null,
+        input.landingUrl || null,
+        input.difficulty || null,
+        input.estimatedMinutes || null,
+        input.allowedCountries,
+        JSON.stringify(input.requirements),
+        input.isFeatured,
+        input.isActive,
+        input.startsAt || null,
+        input.endsAt || null
+      ]
+    );
+    await audit(client, req.auth!.userId, 'offer.create', 'offer', r.rows[0].id.toString(), input);
+    return r.rows[0];
+  });
+  res.status(201).json(created);
+});
+
+router.patch('/offers/:id', async (req: AuthedRequest, res) => {
+  const input = offerPatchSchema.parse(req.body);
+  const offerId = String(req.params.id);
+  const updated = await tx(async client => {
+    const current = await client.query('SELECT * FROM offers WHERE id=$1 FOR UPDATE', [offerId]);
+    if (!current.rows[0]) throw new HttpError(404, 'Offer not found');
+    const before = current.rows[0];
+
+    const next = {
+      providerId: input.providerId !== undefined ? input.providerId?.toString() || null : before.provider_id,
+      externalId: input.externalId !== undefined ? input.externalId : before.external_id,
+      title: input.title ?? before.title,
+      description: input.description ?? before.description,
+      category: input.category ?? before.category,
+      rewardPoints: input.rewardPoints !== undefined ? input.rewardPoints.toString() : before.reward_points,
+      imageUrl: input.imageUrl !== undefined ? input.imageUrl : before.image_url,
+      landingUrl: input.landingUrl !== undefined ? input.landingUrl : before.landing_url,
+      difficulty: input.difficulty !== undefined ? input.difficulty : before.difficulty,
+      estimatedMinutes: input.estimatedMinutes !== undefined ? input.estimatedMinutes : before.estimated_minutes,
+      allowedCountries: input.allowedCountries ?? before.allowed_countries,
+      requirements: input.requirements ?? before.requirements,
+      isFeatured: input.isFeatured ?? before.is_featured,
+      isActive: input.isActive ?? before.is_active,
+      startsAt: input.startsAt !== undefined ? input.startsAt : before.starts_at,
+      endsAt: input.endsAt !== undefined ? input.endsAt : before.ends_at
+    };
+
+    const r = await client.query(
+      `UPDATE offers SET
+       provider_id=$1,external_id=$2,title=$3,description=$4,category=$5,reward_points=$6,image_url=$7,landing_url=$8,
+       difficulty=$9,estimated_minutes=$10,allowed_countries=$11,requirements=$12,is_featured=$13,is_active=$14,
+       starts_at=$15,ends_at=$16,updated_at=NOW()
+       WHERE id=$17
+       RETURNING *`,
+      [
+        next.providerId,next.externalId,next.title,next.description,next.category,next.rewardPoints,next.imageUrl,next.landingUrl,
+        next.difficulty,next.estimatedMinutes,next.allowedCountries,JSON.stringify(next.requirements),next.isFeatured,next.isActive,
+        next.startsAt,next.endsAt,offerId
+      ]
+    );
+    await audit(client, req.auth!.userId, 'offer.update', 'offer', offerId, input);
+    return r.rows[0];
+  });
+  res.json(updated);
+});
+
+router.patch('/tasks/:id', async (req: AuthedRequest, res) => {
+  const input = taskSchema.partial().parse(req.body);
+  const taskId = String(req.params.id);
+  const updated = await tx(async client => {
+    const current = await client.query('SELECT * FROM tasks WHERE id=$1 FOR UPDATE', [taskId]);
+    if (!current.rows[0]) throw new HttpError(404, 'Task not found');
+    const before = current.rows[0];
+    const r = await client.query(
+      `UPDATE tasks SET
+       title=$1,description=$2,category=$3,reward_points=$4,image_url=$5,proof_type=$6,instructions=$7,
+       max_completions=$8,is_repeatable=$9,is_active=$10,expires_at=$11,updated_at=NOW()
+       WHERE id=$12 RETURNING *`,
+      [
+        input.title ?? before.title,
+        input.description ?? before.description,
+        input.category ?? before.category,
+        input.rewardPoints !== undefined ? input.rewardPoints.toString() : before.reward_points,
+        input.imageUrl !== undefined ? input.imageUrl || null : before.image_url,
+        input.proofType ?? before.proof_type,
+        JSON.stringify(input.instructions ?? before.instructions),
+        input.maxCompletions !== undefined ? input.maxCompletions || null : before.max_completions,
+        input.isRepeatable ?? before.is_repeatable,
+        input.isActive ?? before.is_active,
+        input.expiresAt !== undefined ? input.expiresAt || null : before.expires_at,
+        taskId
+      ]
+    );
+    await audit(client, req.auth!.userId, 'task.update', 'task', taskId, input);
+    return r.rows[0];
+  });
+  res.json(updated);
+});
+
+router.patch('/providers/:id', async (req: AuthedRequest, res) => {
+  const input = providerSchema.partial().parse(req.body);
+  const providerId = String(req.params.id);
+  const updated = await tx(async client => {
+    const current = await client.query('SELECT * FROM providers WHERE id=$1 FOR UPDATE', [providerId]);
+    if (!current.rows[0]) throw new HttpError(404, 'Provider not found');
+    const before = current.rows[0];
+
+    const mergedPublic = input.publicConfig !== undefined ? input.publicConfig : before.public_config;
+    const mergedSecret = input.secretConfig !== undefined ? input.secretConfig : before.secret_config;
+
+    const r = await client.query(
+      `UPDATE providers SET
+       slug=$1,name=$2,kind=$3,wall_url=$4,api_base_url=$5,public_config=$6,secret_config=$7,
+       signature_mode=$8,is_enabled=$9,updated_at=NOW()
+       WHERE id=$10
+       RETURNING id,slug,name,kind,wall_url,api_base_url,public_config,signature_mode,is_enabled,created_at,updated_at`,
+      [
+        input.slug ?? before.slug,
+        input.name ?? before.name,
+        input.kind ?? before.kind,
+        input.wallUrl !== undefined ? input.wallUrl || null : before.wall_url,
+        input.apiBaseUrl !== undefined ? input.apiBaseUrl || null : before.api_base_url,
+        JSON.stringify(mergedPublic),
+        JSON.stringify(mergedSecret),
+        input.signatureMode ?? before.signature_mode,
+        input.isEnabled ?? before.is_enabled,
+        providerId
+      ]
+    );
+    await audit(client, req.auth!.userId, 'provider.update', 'provider', providerId, {
+      ...input,
+      ...(input.secretConfig !== undefined ? { secretConfig: '[redacted]' } : {})
+    });
+    return r.rows[0];
+  });
+  res.json(updated);
+});
+
 router.get('/task-submissions', async (req, res) => {
   const status = typeof req.query.status === 'string' ? req.query.status : null;
   const params: unknown[] = [];
