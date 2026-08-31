@@ -147,3 +147,21 @@ export type WatchCampaign = {
   is_active:boolean;
   created_at:string;
 };
+
+export type AdminPayoutMethod = {
+  id:string;
+  method_key:string;
+  name:string;
+  mode:'manual'|'api';
+  provider_id?:string|null;
+  provider_slug?:string|null;
+  provider_name?:string|null;
+  instructions:string;
+  account_fields:Array<Record<string,unknown>>;
+  min_points:string|number;
+  fee_bps:number;
+  is_enabled:boolean;
+  sort_order:number;
+  created_at:string;
+  updated_at:string;
+};
