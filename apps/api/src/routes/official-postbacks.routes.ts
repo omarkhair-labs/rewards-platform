@@ -224,4 +224,85 @@ router.post('/adgem/v3', async (req: any, res) => {
   return res.status(200).json({ ok: true, event });
 });
 
+
+function theoremReachUnsignedUrl(url: string) {
+  const ampIndex = url.lastIndexOf('&hash=');
+  if (ampIndex >= 0) return url.slice(0, ampIndex);
+  const queryIndex = url.lastIndexOf('?hash=');
+  if (queryIndex >= 0) return url.slice(0, queryIndex);
+  return url;
+}
+
+function theoremReachHash(urlBeforeHash: string, secret: string) {
+  return crypto
+    .createHmac('sha1', secret)
+    .update(urlBeforeHash)
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '')
+    .replace(/\n/g, '');
+}
+
+router.get('/theoremreach', async (req, res) => {
+  const p = await provider('theoremreach');
+  const secret = String(p.secret_config?.secretKey || '');
+  if (!secret) throw new HttpError(503, 'TheoremReach secret key is not configured');
+
+  const txId = String(req.query.transaction_id || '');
+  const rawReward = String(req.query.reward || '');
+  const receivedHash = String(req.query.hash || '');
+  const debug = String(req.query.debug || '').toLowerCase() === 'true';
+
+  if (!txId || !rawReward || !receivedHash) {
+    throw new HttpError(400, 'Invalid TheoremReach callback');
+  }
+
+  const unsignedUrl = theoremReachUnsignedUrl(fullPublicUrl(req));
+  const expected = theoremReachHash(unsignedUrl, secret);
+  if (!safeEqual(expected, receivedHash)) {
+    throw new HttpError(403, 'Invalid TheoremReach hash');
+  }
+
+  const sessionResult = await pool.query(
+    `SELECT * FROM provider_sessions
+     WHERE provider_id=$1 AND external_transaction_id=$2
+     LIMIT 1`,
+    [p.id, txId]
+  );
+  const session = sessionResult.rows[0];
+  if (!session) throw new HttpError(404, 'TheoremReach session not found');
+
+  if (debug) {
+    return res.status(200).json({ ok: true, debug: true, credited: false });
+  }
+
+  const event = await tx(async client => {
+    const credited = await Rewards.credit(client, {
+      userId: BigInt(session.user_id),
+      providerId: BigInt(p.id),
+      eventType: 'survey',
+      externalTransactionId: txId,
+      rewardPoints: toPoints(rawReward, rewardScale(p)),
+      rawPayload: {
+        providerPayload: req.query,
+        currency: req.query.currency ?? null,
+        partnerId: req.query.partner_id ?? null
+      },
+      idempotencyKey: `theoremreach:${txId}`
+    });
+
+    await client.query(
+      `UPDATE provider_sessions
+       SET completed_at=COALESCE(completed_at,NOW())
+       WHERE provider_id=$1 AND external_transaction_id=$2`,
+      [p.id, txId]
+    );
+
+    return credited;
+  });
+
+  return res.status(200).json({ ok: true, event });
+});
+
 export default router;
