@@ -108,7 +108,8 @@ router.get('/lootably', async (req, res) => {
 function fullPublicUrl(req: any) {
   const configured = String(process.env.PUBLIC_API_URL || '').replace(/\/$/, '');
   if (configured) return configured + req.originalUrl;
-  const proto = String(req.get('x-forwarded-proto') || req.protocol || 'https').split(',')[0].trim();
+  const protoHeader = String(req.get('x-forwarded-proto') || req.protocol || 'https');
+  const proto = protoHeader.split(',')[0]?.trim() || 'https';
   return `${proto}://${req.get('host')}${req.originalUrl}`;
 }
 
