@@ -410,6 +410,21 @@ router.patch('/withdrawals/:id', requireRole('admin'), async (req: AuthedRequest
     if (!row) throw new HttpError(404, 'Withdrawal not found');
     if (['paid','rejected','failed','cancelled'].includes(row.status)) throw new HttpError(409, 'Withdrawal already finalized');
 
+    const allowedTransitions: Record<string,string[]> = {
+      pending: ['in_review','rejected','failed'],
+      in_review: ['processing','rejected','failed'],
+      processing: ['paid','rejected','failed']
+    };
+    if (!allowedTransitions[row.status]?.includes(input.status)) {
+      throw new HttpError(409, `Invalid withdrawal transition: ${row.status} -> ${input.status}`);
+    }
+    if ((input.status === 'rejected' || input.status === 'failed') && !input.reason) {
+      throw new HttpError(400, 'Reason is required when rejecting or failing a withdrawal');
+    }
+    if (input.status === 'paid' && !input.providerReference) {
+      throw new HttpError(400, 'Payment reference is required before marking a withdrawal paid');
+    }
+
     if (input.status === 'paid') {
       await Wallet.release(client, {
         userId: BigInt(row.user_id),
