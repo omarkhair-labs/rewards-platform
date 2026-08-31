@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   BadgeDollarSign, Boxes, ClipboardCheck, CircleDollarSign, LayoutDashboard,
-  ListTodo, LogOut, Settings, ShieldCheck, UserRound, UsersRound
+  ListTodo, LogOut, Settings, ShieldCheck, UserRound, UsersRound, PlayCircle
 } from 'lucide-react';
 import { apiFetch, clearToken, formatPoints, getToken } from '@/lib/api';
 import type { Me } from '@/lib/types';
@@ -14,6 +14,7 @@ const nav = [
   { href:'/dashboard', label:'Dashboard', icon:LayoutDashboard },
   { href:'/offers', label:'Offers', icon:Boxes },
   { href:'/surveys', label:'Surveys', icon:ClipboardCheck },
+  { href:'/watch', label:'Watch & Earn', icon:PlayCircle },
   { href:'/tasks', label:'Tasks', icon:ListTodo },
   { href:'/affiliates', label:'Affiliates', icon:UsersRound },
   { href:'/cashout', label:'Cashout', icon:CircleDollarSign },
