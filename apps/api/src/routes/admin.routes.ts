@@ -61,8 +61,9 @@ const userPatch = z.object({
 
 router.patch('/users/:id', async (req: AuthedRequest, res) => {
   const input = userPatch.parse(req.body);
+  const targetId = String(req.params.id);
   const updated = await tx(async client => {
-    const current = await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE', [req.params.id]);
+    const current = await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE', [targetId]);
     if (!current.rows[0]) throw new HttpError(404, 'User not found');
 
     const r = await client.query(
@@ -87,10 +88,10 @@ router.patch('/users/:id', async (req: AuthedRequest, res) => {
         input.isPremium ?? null,
         input.withdrawalLocked ?? null,
         input.withdrawalLockReason ?? null,
-        req.params.id
+        targetId
       ]
     );
-    await audit(client, req.auth!.userId, 'user.update', 'user', req.params.id, input);
+    await audit(client, req.auth!.userId, 'user.update', 'user', targetId, input);
     return r.rows[0];
   });
   res.json(updated);
@@ -165,7 +166,7 @@ router.patch('/task-submissions/:id', async (req: AuthedRequest, res) => {
        JOIN tasks t ON t.id=s.task_id
        WHERE s.id=$1
        FOR UPDATE OF s`,
-      [req.params.id]
+      [String(req.params.id)]
     );
     const row = s.rows[0];
     if (!row) throw new HttpError(404, 'Submission not found');
@@ -244,7 +245,7 @@ const withdrawalReview = z.object({
 router.patch('/withdrawals/:id', async (req: AuthedRequest, res) => {
   const input = withdrawalReview.parse(req.body);
   const result = await tx(async client => {
-    const wr = await client.query('SELECT * FROM withdrawals WHERE id=$1 FOR UPDATE', [req.params.id]);
+    const wr = await client.query('SELECT * FROM withdrawals WHERE id=$1 FOR UPDATE', [String(req.params.id)]);
     const row = wr.rows[0];
     if (!row) throw new HttpError(404, 'Withdrawal not found');
     if (['paid','rejected','failed','cancelled'].includes(row.status)) throw new HttpError(409, 'Withdrawal already finalized');
