@@ -26,7 +26,7 @@ router.get('/', requireAuth, async (req: AuthedRequest, res) => {
 });
 
 const submitSchema = z.object({
-  proofUrl: z.string().url().max(2000).optional(),
+  proofUrl: z.string().url().max(2000).refine(value => ['http:','https:'].includes(new URL(value).protocol), 'Proof URL must use http or https').optional(),
   proofText: z.string().trim().max(4000).optional(),
   proofFileUrl: z.string().url().max(2000).optional()
 });
