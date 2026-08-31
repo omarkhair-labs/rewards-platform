@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { apiFetch, getToken, setToken } from '@/lib/api';
 
 type RegisterResponse = {
@@ -12,7 +12,6 @@ type RegisterResponse = {
 
 export default function RegisterPage(){
   const router = useRouter();
-  const params = useSearchParams();
   const [username,setUsername]=useState('');
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
@@ -21,10 +20,14 @@ export default function RegisterPage(){
   const [loading,setLoading]=useState(false);
 
   useEffect(()=>{
-    if (getToken()) router.replace('/dashboard');
-    const ref=params.get('ref');
-    if(ref) setReferralCode(ref);
-  },[router,params]);
+    if (getToken()) {
+      router.replace('/dashboard');
+      return;
+    }
+
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (ref) setReferralCode(ref);
+  },[router]);
 
   async function submit(e:FormEvent){
     e.preventDefault();
