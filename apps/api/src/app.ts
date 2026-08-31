@@ -34,7 +34,7 @@ const apiLimiter = rateLimit({
   limit: 300,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  skip: req => req.path.startsWith('/api/postbacks/')
+  skip: req => req.path.startsWith('/api/postbacks/') || /^\/api\/providers\/[^/]+\/postback$/.test(req.path)
 });
 
 const postbackLimiter = rateLimit({
