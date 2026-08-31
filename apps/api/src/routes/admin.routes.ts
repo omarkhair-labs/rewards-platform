@@ -434,6 +434,13 @@ router.patch('/withdrawals/:id', requireRole('admin'), async (req: AuthedRequest
     }
 
     if (input.status === 'paid') {
+      const walletState = await client.query(
+        'SELECT debt_points FROM wallet_accounts WHERE user_id=$1 FOR UPDATE',
+        [row.user_id]
+      );
+      if (BigInt(walletState.rows[0]?.debt_points || 0) > 0n) {
+        throw new HttpError(409, 'Cannot pay a withdrawal while the account has reward debt');
+      }
       await Wallet.release(client, {
         userId: BigInt(row.user_id),
         points: BigInt(row.points),
