@@ -27,6 +27,43 @@ async function lockWallet(client: pg.PoolClient, userId: bigint) {
   return r.rows[0];
 }
 
+
+async function recalculateLevel(client: pg.PoolClient, userId: bigint) {
+  const current = await client.query(
+    `SELECT u.level,u.rank,w.lifetime_earned_points
+     FROM users u
+     JOIN wallet_accounts w ON w.user_id=u.id
+     WHERE u.id=$1
+     FOR UPDATE OF u`,
+    [userId.toString()]
+  );
+  const user=current.rows[0];
+  if(!user)return;
+
+  const rule = await client.query(
+    `SELECT level,rank,min_lifetime_points
+     FROM level_rules
+     WHERE min_lifetime_points <= $1
+     ORDER BY min_lifetime_points DESC
+     LIMIT 1`,
+    [user.lifetime_earned_points]
+  );
+  const next=rule.rows[0];
+  if(!next)return;
+
+  if(Number(next.level)>Number(user.level)){
+    await client.query(
+      `UPDATE users SET level=$1,rank=$2,updated_at=NOW() WHERE id=$3`,
+      [next.level,next.rank,userId.toString()]
+    );
+    await client.query(
+      `INSERT INTO notifications(user_id,type,title,message)
+       VALUES ($1,'level','Level up',$2)`,
+      [userId.toString(),`You reached ${next.rank} — Level ${next.level}.`]
+    );
+  }
+}
+
 async function writeEntry(
   client: pg.PoolClient,
   input: Mutation,
@@ -64,6 +101,7 @@ export const Wallet = {
        WHERE user_id=$3`,
       [available.toString(), input.points.toString(), input.userId.toString()]
     );
+    await recalculateLevel(client,input.userId);
     return writeEntry(client, input, 'credit', input.points, 0n, available, held);
   },
 
