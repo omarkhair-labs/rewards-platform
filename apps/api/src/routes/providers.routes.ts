@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { pool, tx } from '../db.js';
 import { requireAuth, type AuthedRequest } from '../auth.js';
@@ -8,6 +9,14 @@ import { Rewards } from '../rewards.js';
 import { assertHttpUrl } from '../security.js';
 
 const router = Router();
+
+const genericPostbackLimiter=rateLimit({
+  windowMs:60*1000,
+  limit:600,
+  standardHeaders:'draft-7',
+  legacyHeaders:false,
+  message:{error:'Postback rate limit exceeded'}
+});
 
 router.get('/', requireAuth, async (_req, res) => {
   const r = await pool.query(
@@ -98,7 +107,7 @@ const callbackSchema = z.object({
   signature: z.string().min(16)
 });
 
-router.post('/:slug/postback', async (req, res) => {
+router.post('/:slug/postback', genericPostbackLimiter, async (req, res) => {
   const raw = {
     transactionId: req.body?.transactionId ?? req.query.transactionId ?? req.query.tx ?? req.query.transaction_id,
     userId: req.body?.userId ?? req.query.userId ?? req.query.uid ?? req.query.user_id ?? req.query.subid,
