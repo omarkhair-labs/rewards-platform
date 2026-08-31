@@ -75,6 +75,19 @@ describe('security and money invariants',()=>{
 
     const rejected=await request(app).get('/api/auth/me').set(auth(claimless));
     expect(rejected.status).toBe(401);
+
+    const failedLogin=await request(app)
+      .post('/api/auth/login')
+      .send({email:'admin@example.com',password:'wrong-password'});
+    expect(failedLogin.status).toBe(401);
+
+    const fraud=await pool.query(
+      `SELECT event_type,severity FROM fraud_events
+       WHERE user_id=$1 AND event_type='login_failed'`,
+      [admin.user.id]
+    );
+    expect(fraud.rowCount).toBe(1);
+    expect(fraud.rows[0].severity).toBe('medium');
   });
 
   it('lets moderators approve proof exactly once but not create reward campaigns',async()=>{
