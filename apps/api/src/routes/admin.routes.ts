@@ -13,7 +13,7 @@ async function audit(client: any, actor: bigint, action: string, entityType: str
   await client.query(
     `INSERT INTO audit_logs(actor_user_id,action,entity_type,entity_id,metadata)
      VALUES ($1,$2,$3,$4,$5)`,
-    [actor.toString(), action, entityType, entityId, JSON.stringify(metadata)]
+    [actor.toString(), action, entityType, entityId, JSON.stringify(metadata, (_key,value) => typeof value === 'bigint' ? value.toString() : value)]
   );
 }
 
