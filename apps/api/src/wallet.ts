@@ -27,6 +27,17 @@ async function lockWallet(client: pg.PoolClient, userId: bigint) {
   return r.rows[0];
 }
 
+
+async function clearDebtLockIfSettled(client: pg.PoolClient, userId: bigint, debt: bigint) {
+  if (debt !== 0n) return;
+  await client.query(
+    `UPDATE users
+     SET withdrawal_locked_at=NULL,withdrawal_lock_reason=NULL,updated_at=NOW()
+     WHERE id=$1 AND withdrawal_lock_reason='Outstanding reward debt'`,
+    [userId.toString()]
+  );
+}
+
 async function recalculateLevel(client: pg.PoolClient, userId: bigint) {
   const current = await client.query(
     `SELECT u.level,u.rank,w.lifetime_earned_points
@@ -114,6 +125,7 @@ export const Wallet = {
       [available.toString(), debt.toString(), input.points.toString(), input.userId.toString()]
     );
 
+    await clearDebtLockIfSettled(client,input.userId,debt);
     await recalculateLevel(client,input.userId);
 
     return writeEntry(
@@ -224,6 +236,7 @@ export const Wallet = {
        WHERE user_id=$4`,
       [available.toString(),held.toString(),debt.toString(),input.userId.toString()]
     );
+    await clearDebtLockIfSettled(client,input.userId,debt);
 
     return writeEntry(
       client,input,'release',releasedAvailable,-input.points,-debtPaid,
