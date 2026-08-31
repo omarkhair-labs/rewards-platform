@@ -117,9 +117,13 @@ router.post('/:slug/postback', genericPostbackLimiter, async (req, res) => {
   };
   const input = callbackSchema.parse(raw);
 
+  const slugParam = req.params.slug;
+  const slug = Array.isArray(slugParam) ? slugParam[0] : slugParam;
+  if (!slug) throw new HttpError(400, 'Provider slug is required');
+
   const providerResult = await pool.query(
     `SELECT * FROM providers WHERE slug=$1 AND is_enabled=TRUE`,
-    [req.params.slug.toLowerCase()]
+    [slug.toLowerCase()]
   );
   const provider = providerResult.rows[0];
   if (!provider) throw new HttpError(404, 'Provider not found');
