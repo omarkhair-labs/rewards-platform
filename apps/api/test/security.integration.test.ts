@@ -272,6 +272,20 @@ describe('security and money invariants',()=>{
       [JSON.stringify({postbackSecret:secret})]
     );
 
+    const hugeTx='provider-huge-001';
+    const hugeReward='10000001';
+    const hugeSignature=genericSignature(secret,hugeTx,member.user.id,hugeReward,'completed');
+    const huge=await request(app)
+      .post('/api/providers/testwall/postback')
+      .send({
+        transactionId:hugeTx,
+        userId:member.user.id,
+        rewardPoints:hugeReward,
+        status:'completed',
+        signature:hugeSignature
+      });
+    expect(huge.status).toBe(400);
+
     const txId='provider-tx-001';
     const reward='500';
     const completedSignature=genericSignature(secret,txId,member.user.id,reward,'completed');
