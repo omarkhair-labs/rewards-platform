@@ -55,6 +55,7 @@ const userPatch = z.object({
   status: z.enum(['active','suspended','banned']).optional(),
   role: z.enum(['user','moderator','admin']).optional(),
   isPremium: z.boolean().optional(),
+  premiumExpiresAt: z.string().datetime().nullable().optional(),
   withdrawalLocked: z.boolean().optional(),
   withdrawalLockReason: z.string().trim().max(500).optional()
 });
@@ -71,21 +72,24 @@ router.patch('/users/:id', async (req: AuthedRequest, res) => {
        status=COALESCE($1,status),
        role=COALESCE($2,role),
        is_premium=COALESCE($3,is_premium),
+       premium_expires_at=CASE WHEN $4::timestamptz IS NOT NULL OR $5::boolean IS TRUE THEN $4::timestamptz ELSE premium_expires_at END,
        withdrawal_locked_at=CASE
-         WHEN $4::boolean IS TRUE THEN COALESCE(withdrawal_locked_at,NOW())
-         WHEN $4::boolean IS FALSE THEN NULL
+         WHEN $6::boolean IS TRUE THEN COALESCE(withdrawal_locked_at,NOW())
+         WHEN $6::boolean IS FALSE THEN NULL
          ELSE withdrawal_locked_at END,
        withdrawal_lock_reason=CASE
-         WHEN $4::boolean IS FALSE THEN NULL
-         WHEN $5::text IS NOT NULL THEN $5
+         WHEN $6::boolean IS FALSE THEN NULL
+         WHEN $7::text IS NOT NULL THEN $7
          ELSE withdrawal_lock_reason END,
        updated_at=NOW()
-       WHERE id=$6
-       RETURNING id,username,email,role,status,is_premium,withdrawal_locked_at,withdrawal_lock_reason`,
+       WHERE id=$8
+       RETURNING id,username,email,role,status,is_premium,premium_expires_at,withdrawal_locked_at,withdrawal_lock_reason`,
       [
         input.status || null,
         input.role || null,
         input.isPremium ?? null,
+        input.premiumExpiresAt ?? null,
+        input.premiumExpiresAt !== undefined,
         input.withdrawalLocked ?? null,
         input.withdrawalLockReason ?? null,
         targetId
