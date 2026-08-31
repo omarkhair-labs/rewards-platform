@@ -8,6 +8,7 @@ export async function rebuildTestDatabase() {
     throw new Error('Refusing to rebuild database outside NODE_ENV=test');
   }
 
+  await pool.query('DROP EXTENSION IF EXISTS citext CASCADE');
   await pool.query('DROP SCHEMA IF EXISTS public CASCADE');
   await pool.query('CREATE SCHEMA public');
 
