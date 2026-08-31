@@ -1,5 +1,5 @@
 name: CI
-# Blacksmith access refresh security retry
+# Blacksmith feature-branch verification
 
 on:
   push:
