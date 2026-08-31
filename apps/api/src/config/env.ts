@@ -11,6 +11,7 @@ const schema = z.object({
   APP_ORIGIN: z.string().url(),
   PUBLIC_API_URL: z.string().url().optional(),
   MIN_WITHDRAWAL_POINTS: z.coerce.bigint().default(5000n),
+  MAX_SINGLE_REWARD_POINTS: z.coerce.bigint().positive().default(10000000n),
   REFERRAL_COMMISSION_BPS: z.coerce.number().int().min(0).max(10000).default(1000),
   STORAGE_ENDPOINT: z.string().url().optional(),
   STORAGE_REGION: z.string().min(1).default('auto'),
