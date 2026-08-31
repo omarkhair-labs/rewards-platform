@@ -157,6 +157,63 @@ describe('security and money invariants',()=>{
     expect(audits.rowCount).toBe(2);
   });
 
+  it('allows repeatable tasks after an approved submission while preventing concurrent active duplicates',async()=>{
+    const admin=await register('adminuser','admin@example.com');
+    const moderator=await register('moderator','moderator@example.com');
+    const member=await register('memberuser','member@example.com');
+    await setRole(admin.user.id,'admin');
+    await setRole(moderator.user.id,'moderator');
+
+    const task=await request(app)
+      .post('/api/admin/tasks')
+      .set(auth(admin.token))
+      .send({
+        title:'Repeatable verification',
+        description:'Can be completed more than once after approval.',
+        category:'Social',
+        rewardPoints:'100',
+        proofType:'text',
+        isRepeatable:true,
+        isActive:true
+      });
+    expect(task.status).toBe(201);
+
+    const first=await request(app)
+      .post('/api/tasks/'+task.body.id+'/submit')
+      .set(auth(member.token))
+      .send({proofText:'first'});
+    expect(first.status).toBe(201);
+
+    const blockedConcurrent=await request(app)
+      .post('/api/tasks/'+task.body.id+'/submit')
+      .set(auth(member.token))
+      .send({proofText:'duplicate-active'});
+    expect(blockedConcurrent.status).toBe(409);
+
+    expect((await request(app)
+      .patch('/api/admin/task-submissions/'+first.body.id)
+      .set(auth(moderator.token))
+      .send({decision:'approved'})).status).toBe(200);
+
+    const listed=await request(app).get('/api/tasks').set(auth(member.token));
+    const row=listed.body.find((item:{id:string})=>String(item.id)===String(task.body.id));
+    expect(row.already_submitted).toBe(false);
+
+    const second=await request(app)
+      .post('/api/tasks/'+task.body.id+'/submit')
+      .set(auth(member.token))
+      .send({proofText:'second'});
+    expect(second.status).toBe(201);
+
+    expect((await request(app)
+      .patch('/api/admin/task-submissions/'+second.body.id)
+      .set(auth(moderator.token))
+      .send({decision:'approved'})).status).toBe(200);
+
+    const wallet=await pool.query('SELECT available_points FROM wallet_accounts WHERE user_id=$1',[member.user.id]);
+    expect(wallet.rows[0].available_points).toBe('200');
+  });
+
   it('enforces withdrawal transitions, evidence and balance hold/release invariants',async()=>{
     const admin=await register('adminuser','admin@example.com');
     const member=await register('memberuser','member@example.com');
