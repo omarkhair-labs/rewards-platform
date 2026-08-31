@@ -138,3 +138,14 @@ export type LevelRule = {
   min_lifetime_points:string|number;
   created_at:string;
 };
+
+export type WatchCampaign = {
+  id:string;
+  title:string;
+  media_url:string;
+  duration_seconds:number;
+  reward_points:string|number;
+  daily_limit:number;
+  is_active:boolean;
+  created_at:string;
+};
