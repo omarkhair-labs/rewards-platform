@@ -70,7 +70,7 @@ router.get('/level-progress', requireAuth, async (req: AuthedRequest, res) => {
 
 const profileSchema = z.object({
   fullName: z.string().trim().max(100).optional(),
-  avatarUrl: z.string().url().max(1000).optional().nullable(),
+  avatarUrl: z.string().url().max(1000).refine(value => ['http:','https:'].includes(new URL(value).protocol), 'Avatar URL must use http or https').optional().nullable(),
   countryCode: z.string().trim().max(3).optional(),
   bio: z.string().trim().max(500).optional()
 });
