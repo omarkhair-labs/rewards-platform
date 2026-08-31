@@ -178,7 +178,10 @@ router.get('/cpx/surveys', requireAuth, async (req: AuthedRequest, res) => {
 
   const response = await fetch(
     `https://live-api.cpx-research.com/api/get-surveys.php?${params.toString()}`,
-    { headers: { accept: 'application/json' } }
+    {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(8000)
+    }
   );
 
   if (!response.ok) {
