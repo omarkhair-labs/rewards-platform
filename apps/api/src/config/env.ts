@@ -6,6 +6,8 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
+  JWT_ISSUER: z.string().min(1).default('rewards-api'),
+  JWT_AUDIENCE: z.string().min(1).default('rewards-web'),
   APP_ORIGIN: z.string().url(),
   PUBLIC_API_URL: z.string().url().optional(),
   MIN_WITHDRAWAL_POINTS: z.coerce.bigint().default(5000n),
