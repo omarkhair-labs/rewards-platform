@@ -71,7 +71,7 @@ const userPatch = z.object({
   withdrawalLockReason: z.string().trim().max(500).optional()
 });
 
-router.patch('/users/:id', async (req: AuthedRequest, res) => {
+router.patch('/users/:id', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = userPatch.parse(req.body);
   const targetId = String(req.params.id);
   const updated = await tx(async client => {
@@ -131,7 +131,7 @@ router.get('/tasks', async (_req, res) => {
   res.json(r.rows);
 });
 
-router.post('/tasks', async (req: AuthedRequest, res) => {
+router.post('/tasks', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = taskSchema.parse(req.body);
   const task = await tx(async client => {
     const r = await client.query(
@@ -181,7 +181,7 @@ router.get('/offers', async (_req, res) => {
   res.json(r.rows);
 });
 
-router.post('/offers', async (req: AuthedRequest, res) => {
+router.post('/offers', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = offerSchema.parse(req.body);
   const created = await tx(async client => {
     const r = await client.query(
@@ -215,7 +215,7 @@ router.post('/offers', async (req: AuthedRequest, res) => {
   res.status(201).json(created);
 });
 
-router.patch('/offers/:id', async (req: AuthedRequest, res) => {
+router.patch('/offers/:id', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = offerPatchSchema.parse(req.body);
   const offerId = String(req.params.id);
   const updated = await tx(async client => {
@@ -261,7 +261,7 @@ router.patch('/offers/:id', async (req: AuthedRequest, res) => {
   res.json(updated);
 });
 
-router.patch('/tasks/:id', async (req: AuthedRequest, res) => {
+router.patch('/tasks/:id', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = taskSchema.partial().parse(req.body);
   const taskId = String(req.params.id);
   const updated = await tx(async client => {
@@ -402,7 +402,7 @@ const withdrawalReview = z.object({
   reason: z.string().trim().max(1000).optional()
 });
 
-router.patch('/withdrawals/:id', async (req: AuthedRequest, res) => {
+router.patch('/withdrawals/:id', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = withdrawalReview.parse(req.body);
   const result = await tx(async client => {
     const wr = await client.query('SELECT * FROM withdrawals WHERE id=$1 FOR UPDATE', [String(req.params.id)]);
@@ -477,7 +477,7 @@ router.get('/providers', async (_req, res) => {
   res.json(r.rows);
 });
 
-router.post('/providers', async (req: AuthedRequest, res) => {
+router.post('/providers', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = providerSchema.parse(req.body);
   const provider = await tx(async client => {
     const r = await client.query(
@@ -495,7 +495,7 @@ router.post('/providers', async (req: AuthedRequest, res) => {
   res.status(201).json(provider);
 });
 
-router.patch('/providers/:id', async (req: AuthedRequest, res) => {
+router.patch('/providers/:id', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = providerSchema.partial().parse(req.body);
   const providerId = String(req.params.id);
   const updated = await tx(async client => {
@@ -560,7 +560,7 @@ router.get('/payout-methods',async(_req,res)=>{
   res.json(r.rows);
 });
 
-router.post('/payout-methods',async(req:AuthedRequest,res)=>{
+router.post('/payout-methods',requireRole('admin'),async(req:AuthedRequest,res)=>{
   const input=payoutCatalogSchema.parse(req.body);
   const created=await tx(async client=>{
     const r=await client.query(
@@ -579,7 +579,7 @@ router.post('/payout-methods',async(req:AuthedRequest,res)=>{
   res.status(201).json(created);
 });
 
-router.patch('/payout-methods/:id',async(req:AuthedRequest,res)=>{
+router.patch('/payout-methods/:id',requireRole('admin'),async(req:AuthedRequest,res)=>{
   const input=payoutCatalogSchema.partial().parse(req.body);
   const id=String(req.params.id);
   const updated=await tx(async client=>{
@@ -627,7 +627,7 @@ router.get('/watch-campaigns',async(_req,res)=>{
   res.json(r.rows);
 });
 
-router.post('/watch-campaigns',async(req:AuthedRequest,res)=>{
+router.post('/watch-campaigns',requireRole('admin'),async(req:AuthedRequest,res)=>{
   const input=watchCampaignSchema.parse(req.body);
   const created=await tx(async client=>{
     const r=await client.query(
@@ -642,7 +642,7 @@ router.post('/watch-campaigns',async(req:AuthedRequest,res)=>{
   res.status(201).json(created);
 });
 
-router.patch('/watch-campaigns/:id',async(req:AuthedRequest,res)=>{
+router.patch('/watch-campaigns/:id',requireRole('admin'),async(req:AuthedRequest,res)=>{
   const input=watchCampaignSchema.partial().parse(req.body);
   const id=String(req.params.id);
   const updated=await tx(async client=>{
