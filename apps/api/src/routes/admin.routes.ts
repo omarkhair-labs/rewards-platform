@@ -9,6 +9,14 @@ import { Wallet } from '../wallet.js';
 const router = Router();
 router.use(requireRole('admin','moderator'));
 
+const httpUrl = (maxLength = 4000) => z.string().url().max(maxLength).refine(value => {
+  try {
+    return ['http:','https:'].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}, 'URL must use http or https');
+
 async function audit(client: any, actor: bigint, action: string, entityType: string, entityId: string | null, metadata: unknown = {}) {
   await client.query(
     `INSERT INTO audit_logs(actor_user_id,action,entity_type,entity_id,metadata)
@@ -117,7 +125,7 @@ const taskSchema = z.object({
   description: z.string().trim().max(5000).default(''),
   category: z.string().trim().min(2).max(80),
   rewardPoints: z.coerce.bigint().positive(),
-  imageUrl: z.string().url().max(2000).optional(),
+  imageUrl: httpUrl(2000).optional(),
   proofType: z.enum(['url','text','file','none']).default('url'),
   instructions: z.array(z.unknown()).default([]),
   maxCompletions: z.number().int().positive().optional(),
@@ -157,8 +165,8 @@ const offerSchema = z.object({
   description: z.string().trim().max(5000).default(''),
   category: z.string().trim().min(2).max(80),
   rewardPoints: z.coerce.bigint().min(0n),
-  imageUrl: z.string().url().max(2000).optional().nullable(),
-  landingUrl: z.string().url().max(4000).optional().nullable(),
+  imageUrl: httpUrl(2000).optional().nullable(),
+  landingUrl: httpUrl(4000).optional().nullable(),
   difficulty: z.string().trim().max(50).optional().nullable(),
   estimatedMinutes: z.coerce.number().int().positive().optional().nullable(),
   allowedCountries: z.array(z.string().trim().min(2).max(3)).default([]),
@@ -476,8 +484,8 @@ const providerSchema = z.object({
   slug: z.string().trim().regex(/^[a-z0-9-]+$/),
   name: z.string().trim().min(2).max(100),
   kind: z.enum(['offerwall','survey','payout']),
-  wallUrl: z.string().url().optional(),
-  apiBaseUrl: z.string().url().optional(),
+  wallUrl: httpUrl().optional(),
+  apiBaseUrl: httpUrl().optional(),
   publicConfig: z.record(z.unknown()).default({}),
   secretConfig: z.record(z.unknown()).default({}),
   signatureMode: z.string().trim().max(50).default('hmac_sha256'),
@@ -628,7 +636,7 @@ router.patch('/payout-methods/:id',requireRole('admin'),async(req:AuthedRequest,
 
 const watchCampaignSchema = z.object({
   title:z.string().trim().min(2).max(200),
-  mediaUrl:z.string().url().max(4000),
+  mediaUrl:httpUrl(4000),
   durationSeconds:z.coerce.number().int().min(5).max(86400),
   rewardPoints:z.coerce.bigint().positive(),
   dailyLimit:z.coerce.number().int().positive().max(1000).default(1),
