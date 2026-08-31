@@ -16,6 +16,16 @@ router.get('/', requireAuth, async (req: AuthedRequest, res) => {
   res.json(r.rows);
 });
 
+router.get('/catalog', requireAuth, async (_req, res) => {
+  const r = await pool.query(
+    `SELECT id,method_key,name,mode,instructions,account_fields,min_points,fee_bps,sort_order
+     FROM payout_method_catalog
+     WHERE is_enabled=TRUE
+     ORDER BY sort_order ASC,name ASC`
+  );
+  res.json(r.rows);
+});
+
 router.get('/methods', requireAuth, async (req: AuthedRequest, res) => {
   const r = await pool.query(
     `SELECT id,method_key,label,account_details,is_default,created_at
@@ -27,21 +37,44 @@ router.get('/methods', requireAuth, async (req: AuthedRequest, res) => {
 
 const methodSchema = z.object({
   methodKey: z.string().trim().min(2).max(50),
-  label: z.string().trim().min(2).max(80),
   accountDetails: z.record(z.unknown()),
   isDefault: z.boolean().optional()
 });
 
+function validateAccountDetails(fields: unknown, details: Record<string, unknown>) {
+  if (!Array.isArray(fields)) return;
+  for (const raw of fields) {
+    if (!raw || typeof raw !== 'object') continue;
+    const field = raw as Record<string, unknown>;
+    const key = typeof field.key === 'string' ? field.key : '';
+    const required = field.required !== false;
+    if (!key || !required) continue;
+    const value = details[key];
+    if (value === undefined || value === null || String(value).trim() === '') {
+      throw new HttpError(400, `Missing payout account field: ${key}`);
+    }
+  }
+}
+
 router.post('/methods', requireAuth, async (req: AuthedRequest, res) => {
   const input = methodSchema.parse(req.body);
   const method = await tx(async client => {
+    const catalog = await client.query(
+      `SELECT * FROM payout_method_catalog
+       WHERE method_key=$1 AND is_enabled=TRUE
+       LIMIT 1`,
+      [input.methodKey]
+    );
+    if (!catalog.rows[0]) throw new HttpError(400, 'Unsupported payout method');
+    validateAccountDetails(catalog.rows[0].account_fields, input.accountDetails);
+
     if (input.isDefault) {
       await client.query('UPDATE withdrawal_methods SET is_default=FALSE WHERE user_id=$1', [req.auth!.userId.toString()]);
     }
     const r = await client.query(
       `INSERT INTO withdrawal_methods(user_id,method_key,label,account_details,is_default)
        VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [req.auth!.userId.toString(), input.methodKey, input.label, JSON.stringify(input.accountDetails), Boolean(input.isDefault)]
+      [req.auth!.userId.toString(), input.methodKey, catalog.rows[0].name, JSON.stringify(input.accountDetails), Boolean(input.isDefault)]
     );
     return r.rows[0];
   });
@@ -56,10 +89,6 @@ const requestSchema = z.object({
 
 router.post('/', requireAuth, async (req: AuthedRequest, res) => {
   const input = requestSchema.parse(req.body);
-  if (input.points < env.MIN_WITHDRAWAL_POINTS) {
-    throw new HttpError(400, `Minimum withdrawal is ${env.MIN_WITHDRAWAL_POINTS.toString()} points`);
-  }
-
   const withdrawal = await tx(async client => {
     const prior = await client.query('SELECT * FROM withdrawals WHERE idempotency_key=$1', [input.idempotencyKey]);
     if (prior.rows[0]) return prior.rows[0];
@@ -84,6 +113,21 @@ router.post('/', requireAuth, async (req: AuthedRequest, res) => {
       [input.methodId.toString(), req.auth!.userId.toString()]
     );
     if (!method.rows[0]) throw new HttpError(404, 'Withdrawal method not found');
+
+    const catalog = await client.query(
+      `SELECT * FROM payout_method_catalog
+       WHERE method_key=$1 AND is_enabled=TRUE
+       LIMIT 1`,
+      [method.rows[0].method_key]
+    );
+    if (!catalog.rows[0]) throw new HttpError(400, 'Payout method is unavailable');
+
+    const methodMinimum = BigInt(catalog.rows[0].min_points);
+    const minimum = methodMinimum > env.MIN_WITHDRAWAL_POINTS ? methodMinimum : env.MIN_WITHDRAWAL_POINTS;
+    if (input.points < minimum) {
+      throw new HttpError(400, `Minimum withdrawal for ${catalog.rows[0].name} is ${minimum.toString()} points`);
+    }
+    validateAccountDetails(catalog.rows[0].account_fields, method.rows[0].account_details);
 
     const r = await client.query(
       `INSERT INTO withdrawals(user_id,method_id,method_key,account_snapshot,points,status,idempotency_key)
