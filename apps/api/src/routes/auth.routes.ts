@@ -112,7 +112,7 @@ router.get('/me', requireAuth, async (req: AuthedRequest, res) => {
             u.referral_code,u.level,u.rank,
             (u.is_premium AND (u.premium_expires_at IS NULL OR u.premium_expires_at>NOW())) AS is_premium,
             u.premium_expires_at,
-            w.available_points,w.held_points,w.lifetime_earned_points
+            w.available_points,w.held_points,w.debt_points,w.lifetime_earned_points
      FROM users u
      LEFT JOIN wallet_accounts w ON w.user_id=u.id
      WHERE u.id=$1`,
