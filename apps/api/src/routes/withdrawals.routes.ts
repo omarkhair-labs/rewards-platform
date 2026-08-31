@@ -129,16 +129,26 @@ router.post('/', requireAuth, async (req: AuthedRequest, res) => {
     }
     validateAccountDetails(catalog.rows[0].account_fields, method.rows[0].account_details);
 
+    const feeBps = BigInt(catalog.rows[0].fee_bps || 0);
+    const feePoints = feeBps === 0n ? 0n : (input.points * feeBps + 9999n) / 10000n;
+    const netPoints = input.points - feePoints;
+    if (netPoints <= 0n) throw new HttpError(400, 'Withdrawal fee exceeds payout amount');
+
     const r = await client.query(
-      `INSERT INTO withdrawals(user_id,method_id,method_key,account_snapshot,points,status,idempotency_key)
-       VALUES ($1,$2,$3,$4,$5,'pending',$6)
+      `INSERT INTO withdrawals
+       (user_id,method_id,payout_method_catalog_id,method_key,account_snapshot,points,fee_bps,fee_points,net_points,status,idempotency_key)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10)
        RETURNING *`,
       [
         req.auth!.userId.toString(),
         method.rows[0].id,
+        catalog.rows[0].id,
         method.rows[0].method_key,
         JSON.stringify(method.rows[0].account_details),
         input.points.toString(),
+        Number(catalog.rows[0].fee_bps || 0),
+        feePoints.toString(),
+        netPoints.toString(),
         input.idempotencyKey
       ]
     );
