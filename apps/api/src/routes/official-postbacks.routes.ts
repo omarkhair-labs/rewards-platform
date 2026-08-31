@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { pool, tx } from '../db.js';
 import { HttpError } from '../http.js';
 import { Rewards } from '../rewards.js';
+import { parsePositiveId } from '../security.js';
 
 const router = Router();
 
@@ -92,7 +93,7 @@ router.get('/lootably', async (req, res) => {
 
   await tx(client =>
     Rewards.credit(client, {
-      userId: BigInt(input.userID),
+      userId: parsePositiveId(input.userID, 'Lootably user ID'),
       providerId: BigInt(p.id),
       eventType: 'offer',
       externalTransactionId: input.transactionID,
@@ -169,7 +170,7 @@ router.get('/bitlabs', async (req, res) => {
 
   const event = await tx(client =>
     Rewards.credit(client, {
-      userId: BigInt(uid),
+      userId: parsePositiveId(uid, 'BitLabs user ID'),
       providerId: BigInt(p.id),
       eventType,
       externalTransactionId: txId,
@@ -211,7 +212,7 @@ router.post('/adgem/v3', async (req: any, res) => {
 
   const event = await tx(client =>
     Rewards.credit(client, {
-      userId: BigInt(playerId),
+      userId: parsePositiveId(playerId, 'AdGem player ID'),
       providerId: BigInt(p.id),
       eventType: 'offer',
       externalTransactionId: conversionId,
