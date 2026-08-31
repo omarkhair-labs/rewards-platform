@@ -15,12 +15,13 @@ export type AdminUser = {
   level:number;
   rank:string;
   is_premium:boolean;
+  premium_expires_at?:string|null;
+  withdrawal_locked_at?:string|null;
+  withdrawal_lock_reason?:string|null;
   created_at:string;
   available_points:string|number;
   held_points:string|number;
   lifetime_earned_points:string|number;
-  withdrawal_locked_at?:string|null;
-  withdrawal_lock_reason?:string|null;
 };
 
 export type AdminOffer = {
@@ -126,5 +127,23 @@ export type AuditLog = {
   entity_type:string;
   entity_id?:string|null;
   metadata:Record<string,unknown>;
+  created_at:string;
+};
+
+export type LevelRule = {
+  level:number;
+  rank:string;
+  min_lifetime_points:string|number;
+  created_at:string;
+};
+
+export type WatchCampaign = {
+  id:string;
+  title:string;
+  media_url:string;
+  duration_seconds:number;
+  reward_points:string|number;
+  daily_limit:number;
+  is_active:boolean;
   created_at:string;
 };

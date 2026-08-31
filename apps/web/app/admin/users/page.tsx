@@ -52,14 +52,17 @@ export default function UsersAdmin(){
         <div className="stat-card"><span>Available</span><strong>{formatPoints(selected.available_points)}</strong></div>
         <div className="stat-card"><span>Held</span><strong>{formatPoints(selected.held_points)}</strong></div>
         <div className="stat-card"><span>Level</span><strong>{selected.level}</strong><em>{selected.rank}</em></div>
-        <div className="stat-card"><span>Premium</span><strong>{selected.is_premium?'Yes':'No'}</strong></div>
+        <div className="stat-card"><span>Premium</span><strong>{selected.is_premium?'Yes':'No'}</strong><em>{selected.premium_expires_at?new Date(selected.premium_expires_at).toLocaleDateString():'No expiry'}</em></div>
       </div>
       <div className="section-heading"><h2>Account Controls</h2><span>{selected.email}</span></div>
       <div className="admin-actions">
         <button disabled={saving} className="success-button" onClick={()=>void patch({status:'active'})}>Activate</button>
         <button disabled={saving} className="warning-button" onClick={()=>void patch({status:'suspended'})}>Suspend</button>
         <button disabled={saving} className="danger-button" onClick={()=>void patch({status:'banned'})}>Ban</button>
-        <button disabled={saving} className="secondary-button" onClick={()=>void patch({isPremium:!selected.is_premium})}>{selected.is_premium?'Remove Premium':'Grant Premium'}</button>
+        <button disabled={saving} className="secondary-button" onClick={()=>void patch({isPremium:true,premiumExpiresAt:new Date(Date.now()+30*24*60*60*1000).toISOString()})}>Premium 30d</button>
+        <button disabled={saving} className="secondary-button" onClick={()=>void patch({isPremium:true,premiumExpiresAt:new Date(Date.now()+90*24*60*60*1000).toISOString()})}>Premium 90d</button>
+        <button disabled={saving} className="secondary-button" onClick={()=>void patch({isPremium:true,premiumExpiresAt:null})}>Premium Lifetime</button>
+        <button disabled={saving} className="danger-button" onClick={()=>void patch({isPremium:false,premiumExpiresAt:null})}>Remove Premium</button>
         <button disabled={saving} className="secondary-button" onClick={()=>void patch({withdrawalLocked:true,withdrawalLockReason:'Locked by operator'})}>Lock Withdrawals</button>
         <button disabled={saving} className="secondary-button" onClick={()=>void patch({withdrawalLocked:false})}>Unlock Withdrawals</button>
       </div>

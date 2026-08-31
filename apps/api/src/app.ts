@@ -15,6 +15,7 @@ import integrationsRoutes from './routes/integrations.routes.js';
 import officialPostbackRoutes from './routes/official-postbacks.routes.js';
 import watchRoutes from './routes/watch.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import uploadsRoutes from './routes/uploads.routes.js';
 
 export const app = express();
 
@@ -48,6 +49,7 @@ app.use('/api/providers', providersRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/postbacks', officialPostbackRoutes);
 app.use('/api/watch', watchRoutes);
+app.use('/api/uploads', uploadsRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));

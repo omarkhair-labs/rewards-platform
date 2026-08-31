@@ -34,11 +34,22 @@ router.get('/dashboard', async (_req, res) => {
   });
 });
 
+
+router.get('/level-rules', async (_req,res)=>{
+  const r=await pool.query(
+    `SELECT level,rank,min_lifetime_points,created_at
+     FROM level_rules
+     ORDER BY level ASC`
+  );
+  res.json(r.rows);
+});
+
 router.get('/users', async (req, res) => {
   const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   const params: unknown[] = [];
   let sql = `
-    SELECT u.id,u.username,u.email,u.role,u.status,u.level,u.rank,u.is_premium,u.created_at,
+    SELECT u.id,u.username,u.email,u.role,u.status,u.level,u.rank,u.is_premium,u.premium_expires_at,
+           u.withdrawal_locked_at,u.withdrawal_lock_reason,u.created_at,
            w.available_points,w.held_points,w.lifetime_earned_points
     FROM users u LEFT JOIN wallet_accounts w ON w.user_id=u.id
   `;
@@ -55,6 +66,7 @@ const userPatch = z.object({
   status: z.enum(['active','suspended','banned']).optional(),
   role: z.enum(['user','moderator','admin']).optional(),
   isPremium: z.boolean().optional(),
+  premiumExpiresAt: z.string().datetime().nullable().optional(),
   withdrawalLocked: z.boolean().optional(),
   withdrawalLockReason: z.string().trim().max(500).optional()
 });
@@ -71,21 +83,24 @@ router.patch('/users/:id', async (req: AuthedRequest, res) => {
        status=COALESCE($1,status),
        role=COALESCE($2,role),
        is_premium=COALESCE($3,is_premium),
+       premium_expires_at=CASE WHEN $4::timestamptz IS NOT NULL OR $5::boolean IS TRUE THEN $4::timestamptz ELSE premium_expires_at END,
        withdrawal_locked_at=CASE
-         WHEN $4::boolean IS TRUE THEN COALESCE(withdrawal_locked_at,NOW())
-         WHEN $4::boolean IS FALSE THEN NULL
+         WHEN $6::boolean IS TRUE THEN COALESCE(withdrawal_locked_at,NOW())
+         WHEN $6::boolean IS FALSE THEN NULL
          ELSE withdrawal_locked_at END,
        withdrawal_lock_reason=CASE
-         WHEN $4::boolean IS FALSE THEN NULL
-         WHEN $5::text IS NOT NULL THEN $5
+         WHEN $6::boolean IS FALSE THEN NULL
+         WHEN $7::text IS NOT NULL THEN $7
          ELSE withdrawal_lock_reason END,
        updated_at=NOW()
-       WHERE id=$6
-       RETURNING id,username,email,role,status,is_premium,withdrawal_locked_at,withdrawal_lock_reason`,
+       WHERE id=$8
+       RETURNING id,username,email,role,status,is_premium,premium_expires_at,withdrawal_locked_at,withdrawal_lock_reason`,
       [
         input.status || null,
         input.role || null,
         input.isPremium ?? null,
+        input.premiumExpiresAt ?? null,
+        input.premiumExpiresAt !== undefined,
         input.withdrawalLocked ?? null,
         input.withdrawalLockReason ?? null,
         targetId
@@ -519,6 +534,65 @@ router.patch('/providers/:id', async (req: AuthedRequest, res) => {
   res.json(updated);
 });
 
+
+
+const watchCampaignSchema = z.object({
+  title:z.string().trim().min(2).max(200),
+  mediaUrl:z.string().url().max(4000),
+  durationSeconds:z.coerce.number().int().min(5).max(86400),
+  rewardPoints:z.coerce.bigint().positive(),
+  dailyLimit:z.coerce.number().int().positive().max(1000).default(1),
+  isActive:z.boolean().default(true)
+});
+
+router.get('/watch-campaigns',async(_req,res)=>{
+  const r=await pool.query(
+    `SELECT * FROM watch_campaigns ORDER BY created_at DESC`
+  );
+  res.json(r.rows);
+});
+
+router.post('/watch-campaigns',async(req:AuthedRequest,res)=>{
+  const input=watchCampaignSchema.parse(req.body);
+  const created=await tx(async client=>{
+    const r=await client.query(
+      `INSERT INTO watch_campaigns(title,media_url,duration_seconds,reward_points,daily_limit,is_active)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING *`,
+      [input.title,input.mediaUrl,input.durationSeconds,input.rewardPoints.toString(),input.dailyLimit,input.isActive]
+    );
+    await audit(client,req.auth!.userId,'watch_campaign.create','watch_campaign',r.rows[0].id.toString(),input);
+    return r.rows[0];
+  });
+  res.status(201).json(created);
+});
+
+router.patch('/watch-campaigns/:id',async(req:AuthedRequest,res)=>{
+  const input=watchCampaignSchema.partial().parse(req.body);
+  const id=String(req.params.id);
+  const updated=await tx(async client=>{
+    const current=await client.query('SELECT * FROM watch_campaigns WHERE id=$1 FOR UPDATE',[id]);
+    if(!current.rows[0])throw new HttpError(404,'Watch campaign not found');
+    const before=current.rows[0];
+    const r=await client.query(
+      `UPDATE watch_campaigns SET
+       title=$1,media_url=$2,duration_seconds=$3,reward_points=$4,daily_limit=$5,is_active=$6
+       WHERE id=$7 RETURNING *`,
+      [
+        input.title??before.title,
+        input.mediaUrl??before.media_url,
+        input.durationSeconds??before.duration_seconds,
+        input.rewardPoints!==undefined?input.rewardPoints.toString():before.reward_points,
+        input.dailyLimit??before.daily_limit,
+        input.isActive??before.is_active,
+        id
+      ]
+    );
+    await audit(client,req.auth!.userId,'watch_campaign.update','watch_campaign',id,input);
+    return r.rows[0];
+  });
+  res.json(updated);
+});
 
 router.get('/fraud-events', async (_req, res) => {
   const r = await pool.query(

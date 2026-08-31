@@ -29,6 +29,45 @@ router.get('/dashboard', requireAuth, async (req: AuthedRequest, res) => {
   });
 });
 
+
+router.get('/level-progress', requireAuth, async (req: AuthedRequest, res) => {
+  const userId=req.auth!.userId.toString();
+  const current=await pool.query(
+    `SELECT u.level,u.rank,w.lifetime_earned_points
+     FROM users u
+     JOIN wallet_accounts w ON w.user_id=u.id
+     WHERE u.id=$1`,
+    [userId]
+  );
+  const row=current.rows[0];
+  if(!row)return res.status(404).json({error:'User not found'});
+
+  const next=await pool.query(
+    `SELECT level,rank,min_lifetime_points
+     FROM level_rules
+     WHERE min_lifetime_points > $1
+     ORDER BY min_lifetime_points ASC
+     LIMIT 1`,
+    [row.lifetime_earned_points]
+  );
+
+  const currentRule=await pool.query(
+    `SELECT level,rank,min_lifetime_points
+     FROM level_rules
+     WHERE level=$1
+     LIMIT 1`,
+    [row.level]
+  );
+
+  res.json({
+    level:row.level,
+    rank:row.rank,
+    lifetimePoints:row.lifetime_earned_points,
+    currentThreshold:currentRule.rows[0]?.min_lifetime_points ?? 0,
+    nextLevel:next.rows[0] ?? null
+  });
+});
+
 const profileSchema = z.object({
   fullName: z.string().trim().max(100).optional(),
   avatarUrl: z.string().url().max(1000).optional().nullable(),

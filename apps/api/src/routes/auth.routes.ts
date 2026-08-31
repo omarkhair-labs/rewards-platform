@@ -81,7 +81,7 @@ router.post('/login', async (req, res) => {
       referralCode: user.referral_code,
       level: user.level,
       rank: user.rank,
-      isPremium: user.is_premium
+      isPremium: Boolean(user.is_premium && (!user.premium_expires_at || new Date(user.premium_expires_at) > new Date()))
     }
   });
 });
@@ -89,7 +89,9 @@ router.post('/login', async (req, res) => {
 router.get('/me', requireAuth, async (req: AuthedRequest, res) => {
   const result = await pool.query(
     `SELECT u.id,u.username,u.email,u.role,u.status,u.full_name,u.avatar_url,u.country_code,u.bio,
-            u.referral_code,u.level,u.rank,u.is_premium,u.premium_expires_at,
+            u.referral_code,u.level,u.rank,
+            (u.is_premium AND (u.premium_expires_at IS NULL OR u.premium_expires_at>NOW())) AS is_premium,
+            u.premium_expires_at,
             w.available_points,w.held_points,w.lifetime_earned_points
      FROM users u
      LEFT JOIN wallet_accounts w ON w.user_id=u.id

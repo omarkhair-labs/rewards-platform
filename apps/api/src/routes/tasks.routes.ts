@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool, tx } from '../db.js';
 import { requireAuth, type AuthedRequest } from '../auth.js';
 import { HttpError } from '../http.js';
+import { env } from '../config/env.js';
 
 const router = Router();
 
@@ -50,7 +51,14 @@ router.post('/:id/submit', requireAuth, async (req: AuthedRequest, res) => {
 
     if (task.proof_type === 'url' && !input.proofUrl) throw new HttpError(400, 'Proof URL required');
     if (task.proof_type === 'text' && !input.proofText) throw new HttpError(400, 'Proof text required');
-    if (task.proof_type === 'file' && !input.proofFileUrl) throw new HttpError(400, 'Proof file required');
+    if (task.proof_type === 'file') {
+      if (!input.proofFileUrl) throw new HttpError(400, 'Proof file required');
+      if (!env.STORAGE_PUBLIC_BASE_URL) throw new HttpError(503, 'Proof file storage is not configured');
+      const expectedPrefix = env.STORAGE_PUBLIC_BASE_URL.replace(/\/$/, '') + '/proofs/' + req.auth!.userId.toString() + '/';
+      if (!input.proofFileUrl.startsWith(expectedPrefix)) {
+        throw new HttpError(400, 'Proof file must come from platform storage');
+      }
+    }
 
     if (!task.is_repeatable) {
       const prior = await client.query(

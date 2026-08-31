@@ -10,6 +10,7 @@ export default function TasksPage(){
   const [selected,setSelected]=useState<Task|null>(null);
   const [proofUrl,setProofUrl]=useState('');
   const [proofText,setProofText]=useState('');
+  const [proofFile,setProofFile]=useState<File|null>(null);
   const [filter,setFilter]=useState('All');
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(true);
@@ -35,8 +36,20 @@ export default function TasksPage(){
       const body:Record<string,string>={};
       if(proofUrl.trim())body.proofUrl=proofUrl.trim();
       if(proofText.trim())body.proofText=proofText.trim();
+
+      if(selected.proof_type==='file'){
+        if(!proofFile)throw new Error('Choose a proof file first');
+        const init=await apiFetch<{uploadUrl:string;publicUrl:string;headers:Record<string,string>}>('/api/uploads/proof',{
+          method:'POST',
+          body:JSON.stringify({filename:proofFile.name,contentType:proofFile.type,contentLength:proofFile.size})
+        });
+        const upload=await fetch(init.uploadUrl,{method:'PUT',headers:init.headers,body:proofFile});
+        if(!upload.ok)throw new Error('Proof file upload failed');
+        body.proofFileUrl=init.publicUrl;
+      }
+
       await apiFetch(`/api/tasks/${selected.id}/submit`,{method:'POST',body:JSON.stringify(body)});
-      setSelected(null);setProofUrl('');setProofText('');
+      setSelected(null);setProofUrl('');setProofText('');setProofFile(null);
       await load();
     }catch(err){setError(err instanceof Error ? err.message : 'Unable to submit proof');}
     finally{setSubmitting(false);}
@@ -74,9 +87,9 @@ export default function TasksPage(){
         <div className="form-grid mt">
           {(selected.proof_type==='url'||selected.proof_type==='none')&&<div className="field"><label>Proof URL {selected.proof_type==='none'?'(optional)':''}</label><input value={proofUrl} onChange={e=>setProofUrl(e.target.value)} required={selected.proof_type==='url'} placeholder="https://..."/></div>}
           {(selected.proof_type==='text'||selected.proof_type==='url'||selected.proof_type==='none')&&<div className="field"><label>Notes</label><textarea value={proofText} onChange={e=>setProofText(e.target.value)} required={selected.proof_type==='text'} placeholder="Add proof details for the reviewer"/></div>}
-          {selected.proof_type==='file'&&<div className="notice">File proof upload is the next storage lane. This task cannot be submitted until object storage is configured.</div>}
+          {selected.proof_type==='file'&&<><div className="field"><label>Proof File</label><input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" required onChange={e=>setProofFile(e.target.files?.[0]||null)}/></div><div className="notice">Accepted: PNG, JPG, WebP or PDF up to 10 MB. The file is uploaded directly to secured object storage before submission.</div></>}
         </div>
-        <div className="modal-actions"><button type="button" className="secondary-button" onClick={()=>setSelected(null)}>Close</button>{selected.proof_type!=='file'&&<button disabled={submitting} className="primary-button">{submitting?'Submitting...':'Submit Proof'}</button>}</div>
+        <div className="modal-actions"><button type="button" className="secondary-button" onClick={()=>{setSelected(null);setProofFile(null);}}>Close</button><button disabled={submitting} className="primary-button">{submitting?'Submitting...':'Submit Proof'}</button></div>
       </form>
     </div>}
   </>;
