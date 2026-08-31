@@ -535,6 +535,65 @@ router.patch('/providers/:id', async (req: AuthedRequest, res) => {
 });
 
 
+
+const watchCampaignSchema = z.object({
+  title:z.string().trim().min(2).max(200),
+  mediaUrl:z.string().url().max(4000),
+  durationSeconds:z.coerce.number().int().min(5).max(86400),
+  rewardPoints:z.coerce.bigint().positive(),
+  dailyLimit:z.coerce.number().int().positive().max(1000).default(1),
+  isActive:z.boolean().default(true)
+});
+
+router.get('/watch-campaigns',async(_req,res)=>{
+  const r=await pool.query(
+    `SELECT * FROM watch_campaigns ORDER BY created_at DESC`
+  );
+  res.json(r.rows);
+});
+
+router.post('/watch-campaigns',async(req:AuthedRequest,res)=>{
+  const input=watchCampaignSchema.parse(req.body);
+  const created=await tx(async client=>{
+    const r=await client.query(
+      `INSERT INTO watch_campaigns(title,media_url,duration_seconds,reward_points,daily_limit,is_active)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING *`,
+      [input.title,input.mediaUrl,input.durationSeconds,input.rewardPoints.toString(),input.dailyLimit,input.isActive]
+    );
+    await audit(client,req.auth!.userId,'watch_campaign.create','watch_campaign',r.rows[0].id.toString(),input);
+    return r.rows[0];
+  });
+  res.status(201).json(created);
+});
+
+router.patch('/watch-campaigns/:id',async(req:AuthedRequest,res)=>{
+  const input=watchCampaignSchema.partial().parse(req.body);
+  const id=String(req.params.id);
+  const updated=await tx(async client=>{
+    const current=await client.query('SELECT * FROM watch_campaigns WHERE id=$1 FOR UPDATE',[id]);
+    if(!current.rows[0])throw new HttpError(404,'Watch campaign not found');
+    const before=current.rows[0];
+    const r=await client.query(
+      `UPDATE watch_campaigns SET
+       title=$1,media_url=$2,duration_seconds=$3,reward_points=$4,daily_limit=$5,is_active=$6
+       WHERE id=$7 RETURNING *`,
+      [
+        input.title??before.title,
+        input.mediaUrl??before.media_url,
+        input.durationSeconds??before.duration_seconds,
+        input.rewardPoints!==undefined?input.rewardPoints.toString():before.reward_points,
+        input.dailyLimit??before.daily_limit,
+        input.isActive??before.is_active,
+        id
+      ]
+    );
+    await audit(client,req.auth!.userId,'watch_campaign.update','watch_campaign',id,input);
+    return r.rows[0];
+  });
+  res.json(updated);
+});
+
 router.get('/fraud-events', async (_req, res) => {
   const r = await pool.query(
     `SELECT f.*,u.username,u.email
