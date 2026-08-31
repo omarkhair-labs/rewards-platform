@@ -1,71 +1,83 @@
 'use client';
 
-import { useState } from 'react';
-import { tasks } from '@/lib/demo';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { apiFetch, formatPoints } from '@/lib/api';
+import type { Task } from '@/lib/types';
+import { ErrorPanel, LoadingPanel } from '@/components/LoadingPanel';
 
 export default function TasksPage(){
-  const [selected,setSelected]=useState<(typeof tasks)[number]|null>(null);
-  const [mode,setMode]=useState<'details'|'proof'>('details');
+  const [tasks,setTasks]=useState<Task[]>([]);
+  const [selected,setSelected]=useState<Task|null>(null);
+  const [proofUrl,setProofUrl]=useState('');
+  const [proofText,setProofText]=useState('');
   const [filter,setFilter]=useState('All');
+  const [error,setError]=useState('');
+  const [loading,setLoading]=useState(true);
+  const [submitting,setSubmitting]=useState(false);
 
-  const filtered = filter==='All' ? tasks : tasks.filter(t=>t.status===filter);
+  const load=useCallback(async()=>{
+    setError('');
+    try{ setTasks(await apiFetch<Task[]>('/api/tasks')); }
+    catch(err){ setError(err instanceof Error ? err.message : 'Failed to load tasks'); }
+    finally{ setLoading(false); }
+  },[]);
+
+  useEffect(()=>{void load();},[load]);
+
+  const categories=useMemo(()=>['All',...Array.from(new Set(tasks.map(t=>t.category))).sort()],[tasks]);
+  const filtered=filter==='All'?tasks:tasks.filter(t=>t.category===filter);
+
+  async function submit(e:FormEvent){
+    e.preventDefault();
+    if(!selected)return;
+    setSubmitting(true);setError('');
+    try{
+      const body:Record<string,string>={};
+      if(proofUrl.trim())body.proofUrl=proofUrl.trim();
+      if(proofText.trim())body.proofText=proofText.trim();
+      await apiFetch(`/api/tasks/${selected.id}/submit`,{method:'POST',body:JSON.stringify(body)});
+      setSelected(null);setProofUrl('');setProofText('');
+      await load();
+    }catch(err){setError(err instanceof Error ? err.message : 'Unable to submit proof');}
+    finally{setSubmitting(false);}
+  }
+
+  if(loading)return <LoadingPanel label="Loading tasks..." />;
+  if(error&&!tasks.length)return <ErrorPanel message={error} retry={()=>void load()}/>;
 
   return <>
-    <section className="hero-title"><h1>🍇 Available Tasks</h1><p>Complete tasks, submit proof and wait for approval before rewards are added to your account.</p></section>
-    <div className="center"><button className="primary-button" style={{padding:'7px 13px'}}>How it works</button></div>
-
-    <div className="filters mt" style={{justifyContent:'center'}}>
-      {['All','Available','In Review','Completed'].map(f=><button key={f} className={'filter '+(filter===f?'active':'')} onClick={()=>setFilter(f)}>{f}</button>)}
-    </div>
-
-    <div className="task-types">
-      <div className="task-type"><b>Social Tasks</b><span>Follow, join & share</span></div>
-      <div className="task-type"><b>Timed Tasks</b><span>Limited availability</span></div>
-      <div className="task-type"><b>Reviews</b><span>Proof required</span></div>
-      <div className="task-type"><b>Community</b><span>Special campaigns</span></div>
-    </div>
-
-    <div className="panel">
+    <section className="hero-title"><h1>Available Tasks</h1><p>Complete the requirement, submit proof, and receive the reward only after moderation approval.</p></section>
+    {error&&<div className="notice" style={{borderColor:'rgba(255,90,126,.4)',color:'#ff9bb5'}}>{error}</div>}
+    <div className="filters mt" style={{justifyContent:'center'}}>{categories.map(f=><button key={f} className={'filter '+(filter===f?'active':'')} onClick={()=>setFilter(f)}>{f}</button>)}</div>
+    <div className="panel mt">
       <table className="table">
-        <thead><tr><th>Task</th><th>Description</th><th>Reward</th><th>Quota</th><th>Status</th><th>Action</th></tr></thead>
-        <tbody>{filtered.map(t=><tr key={t.id}>
-          <td><b>{t.title}</b></td>
-          <td className="muted">{t.category}</td>
-          <td><span className="reward">{t.reward} Coins</span></td>
-          <td>{t.quota}</td>
-          <td><span className={'status-pill '+(t.status==='Available'?'available':'review')}>{t.status}</span></td>
-          <td><button className="primary-button" onClick={()=>{setSelected(t);setMode('details')}}>{t.status==='In Review'?'View':'View details'}</button></td>
-        </tr>)}</tbody>
+        <thead><tr><th>Task</th><th>Category</th><th>Reward</th><th>Progress</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>{filtered.length?filtered.map(t=><tr key={t.id}>
+          <td><b>{t.title}</b></td><td>{t.category}</td>
+          <td><span className="reward">{formatPoints(t.reward_points)} Coins</span></td>
+          <td>{t.max_completions==null?'Open':`${t.completions_count||0} / ${t.max_completions}`}</td>
+          <td><span className={'status-pill '+(t.already_submitted?'review':'available')}>{t.already_submitted?'Submitted':'Available'}</span></td>
+          <td><button disabled={t.already_submitted} className="primary-button" onClick={()=>setSelected(t)}>{t.already_submitted?'In review':'View details'}</button></td>
+        </tr>):<tr><td colSpan={6} className="center muted" style={{padding:30}}>No tasks available right now.</td></tr>}</tbody>
       </table>
     </div>
-
-    <div className="split mt">
-      <div className="panel"><h2 style={{fontSize:10}}>Task Guidelines</h2><p className="muted" style={{fontSize:8}}>Complete every requirement exactly. Invalid or recycled proof can be rejected and repeated abuse may lock task access.</p></div>
-      <div className="panel"><h2 style={{fontSize:10}}>Tips for Task Success</h2><p className="muted" style={{fontSize:8}}>Read carefully, submit a clear proof link and keep the proof available until moderation finishes.</p></div>
-    </div>
-
     {selected&&<div className="modal-backdrop" onClick={()=>setSelected(null)}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
-        {mode==='details'?<>
-          <h2>Task Details</h2>
-          <div className="stats-grid">
-            <div className="stat-card"><span>Task</span><strong>{selected.id}</strong><em>{selected.category}</em></div>
-            <div className="stat-card"><span>Reward</span><strong>{selected.reward}</strong><em>Coins</em></div>
-            <div className="stat-card"><span>Remaining</span><strong>{selected.quota.split('/')[0]}</strong><em>Slots used</em></div>
-            <div className="stat-card"><span>Status</span><strong>{selected.status}</strong><em>Current state</em></div>
-          </div>
-          <div className="panel mt"><b style={{fontSize:9}}>Task instructions</b><ul className="muted" style={{fontSize:8,lineHeight:1.8}}><li>Open the required destination.</li><li>Complete the requested action once.</li><li>Copy a public proof URL.</li><li>Submit proof and wait for moderation.</li></ul></div>
-          <div className="modal-actions"><button className="secondary-button" onClick={()=>setSelected(null)}>Close</button>{selected.status==='Available'&&<button className="primary-button" onClick={()=>setMode('proof')}>Submit proof</button>}</div>
-        </>:<>
-          <h2>Submit Proof of Completion</h2>
-          <div className="form-grid">
-            <div className="field"><label>Proof URL</label><input placeholder="https://..."/></div>
-            <div className="field"><label>Notes</label><textarea placeholder="Add anything the reviewer should know"/></div>
-          </div>
-          <div className="panel mt"><b style={{fontSize:8}}>Proof Guidelines</b><p className="muted" style={{fontSize:7}}>Use a valid accessible link, do not reuse proof from another task, and keep it available until review is complete.</p></div>
-          <div className="modal-actions"><button className="secondary-button" onClick={()=>setMode('details')}>Back</button><button className="primary-button" onClick={()=>setSelected(null)}>Submit Proof</button></div>
-        </>}
-      </div>
+      <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={submit}>
+        <h2>{selected.title}</h2>
+        <div className="stats-grid">
+          <div className="stat-card"><span>Reward</span><strong>{formatPoints(selected.reward_points)}</strong><em>Coins after approval</em></div>
+          <div className="stat-card"><span>Category</span><strong>{selected.category}</strong></div>
+          <div className="stat-card"><span>Proof</span><strong>{selected.proof_type}</strong></div>
+          <div className="stat-card"><span>Status</span><strong>Available</strong></div>
+        </div>
+        <div className="panel mt"><b style={{fontSize:9}}>Instructions</b><p className="muted" style={{fontSize:8}}>{selected.description}</p></div>
+        <div className="form-grid mt">
+          {(selected.proof_type==='url'||selected.proof_type==='none')&&<div className="field"><label>Proof URL {selected.proof_type==='none'?'(optional)':''}</label><input value={proofUrl} onChange={e=>setProofUrl(e.target.value)} required={selected.proof_type==='url'} placeholder="https://..."/></div>}
+          {(selected.proof_type==='text'||selected.proof_type==='url'||selected.proof_type==='none')&&<div className="field"><label>Notes</label><textarea value={proofText} onChange={e=>setProofText(e.target.value)} required={selected.proof_type==='text'} placeholder="Add proof details for the reviewer"/></div>}
+          {selected.proof_type==='file'&&<div className="notice">File proof upload is the next storage lane. This task cannot be submitted until object storage is configured.</div>}
+        </div>
+        <div className="modal-actions"><button type="button" className="secondary-button" onClick={()=>setSelected(null)}>Close</button>{selected.proof_type!=='file'&&<button disabled={submitting} className="primary-button">{submitting?'Submitting...':'Submit Proof'}</button>}</div>
+      </form>
     </div>}
   </>;
 }
