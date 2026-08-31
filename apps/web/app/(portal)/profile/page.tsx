@@ -5,6 +5,8 @@ import { apiFetch, formatPoints } from '@/lib/api';
 import type { Dashboard, Me, Withdrawal } from '@/lib/types';
 import { ErrorPanel, LoadingPanel } from '@/components/LoadingPanel';
 
+type LevelProgress={level:number;rank:string;lifetimePoints:string|number;currentThreshold:string|number;nextLevel:{level:number;rank:string;min_lifetime_points:string|number}|null};
+
 type WalletEntry={
   id:string;
   direction:string;
@@ -19,6 +21,7 @@ export default function ProfilePage(){
   const [dashboard,setDashboard]=useState<Dashboard|null>(null);
   const [transactions,setTransactions]=useState<WalletEntry[]>([]);
   const [withdrawals,setWithdrawals]=useState<Withdrawal[]>([]);
+  const [levelProgress,setLevelProgress]=useState<LevelProgress|null>(null);
   const [tab,setTab]=useState<'earnings'|'withdrawals'>('earnings');
   const [editing,setEditing]=useState(false);
   const [fullName,setFullName]=useState('');
@@ -31,13 +34,14 @@ export default function ProfilePage(){
   const load=useCallback(async()=>{
     setError('');
     try{
-      const [user,d,tx,w]=await Promise.all([
+      const [user,d,tx,w,lp]=await Promise.all([
         apiFetch<Me>('/api/auth/me'),
         apiFetch<Dashboard>('/api/account/dashboard'),
         apiFetch<WalletEntry[]>('/api/account/transactions'),
-        apiFetch<Withdrawal[]>('/api/withdrawals')
+        apiFetch<Withdrawal[]>('/api/withdrawals'),
+        apiFetch<LevelProgress>('/api/account/level-progress')
       ]);
-      setMe(user);setDashboard(d);setTransactions(tx);setWithdrawals(w);
+      setMe(user);setDashboard(d);setTransactions(tx);setWithdrawals(w);setLevelProgress(lp);
       setFullName(user.full_name||'');
       setCountryCode(user.country_code||'');
       setBio(user.bio||'');
@@ -103,6 +107,14 @@ export default function ProfilePage(){
       <div className="stat-card"><span>Referral Program</span><strong>{dashboard.referrals}</strong><em>Invited members</em></div>
       <div className="stat-card"><span>Security Score</span><div className="progress-ring" style={{marginTop:7,background:'conic-gradient(#65e59a 0 '+securityScore+'%,#2b294a '+securityScore+'% 100%)'}}><b>{securityScore}</b></div></div>
     </div>
+
+    {levelProgress&&<div className="panel mt">
+      <div className="section-heading"><h2>Level Progress</h2><span>{levelProgress.rank} · Level {levelProgress.level}</span></div>
+      {levelProgress.nextLevel?<>
+        <div className="progress-track"><div className="progress-fill" style={{width:Math.max(0,Math.min(100,((Number(levelProgress.lifetimePoints)-Number(levelProgress.currentThreshold))/(Number(levelProgress.nextLevel.min_lifetime_points)-Number(levelProgress.currentThreshold)))*100))+'%'}}/></div>
+        <div style={{display:'flex',justifyContent:'space-between',marginTop:7,fontSize:7}}><span>{formatPoints(levelProgress.lifetimePoints)} lifetime points</span><span>{formatPoints(levelProgress.nextLevel.min_lifetime_points)} for {levelProgress.nextLevel.rank}</span></div>
+      </>:<div className="notice">Highest rank reached.</div>}
+    </div>}
 
     <div className="panel mt">
       <div className="section-heading"><h2>Earning Breakdown</h2><span>Live wallet data</span></div>
