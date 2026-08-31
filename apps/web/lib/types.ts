@@ -99,3 +99,15 @@ export type ReferralSummary = {
     created_at:string;
   }>;
 };
+
+export type PayoutCatalogMethod = {
+  id:string|number;
+  method_key:string;
+  name:string;
+  mode:'manual'|'api';
+  instructions:string;
+  account_fields:Array<{key:string;label:string;type?:string;required?:boolean}>;
+  min_points:string|number;
+  fee_bps:number;
+  sort_order:number;
+};
