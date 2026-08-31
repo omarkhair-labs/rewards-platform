@@ -81,6 +81,9 @@ export type Withdrawal = {
   id: string | number;
   method_key: string;
   points: string | number;
+  fee_bps?: number;
+  fee_points?: string | number;
+  net_points?: string | number;
   status: string;
   requested_at: string;
   rejection_reason?: string | null;
@@ -98,4 +101,16 @@ export type ReferralSummary = {
     referred_username:string;
     created_at:string;
   }>;
+};
+
+export type PayoutCatalogMethod = {
+  id:string|number;
+  method_key:string;
+  name:string;
+  mode:'manual'|'api';
+  instructions:string;
+  account_fields:Array<{key:string;label:string;type?:string;required?:boolean}>;
+  min_points:string|number;
+  fee_bps:number;
+  sort_order:number;
 };

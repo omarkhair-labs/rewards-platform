@@ -42,8 +42,8 @@ export default function WithdrawalsAdmin(){
       <div className="filters">{['pending','in_review','processing','paid','rejected','failed'].map(s=><button key={s} className={'filter '+(status===s?'active':'')} onClick={()=>setStatus(s)}>{s.replace('_',' ')}</button>)}</div>
     </div>
     {error&&<div className="notice" style={{borderColor:'rgba(255,90,126,.4)',color:'#ff9bb5'}}>{error}</div>}
-    <div className="panel"><table className="table"><thead><tr><th>User</th><th>Method</th><th>Points</th><th>Status</th><th>Requested</th><th>Reference</th><th>Action</th></tr></thead>
-      <tbody>{rows.length?rows.map(w=><tr key={w.id}><td><b>{w.username}</b><br/><span className="muted">{w.email}</span></td><td>{w.method_key}</td><td>{formatPoints(w.points)}</td><td><span className={'status-pill '+(w.status==='paid'?'available':'review')}>{w.status.replace('_',' ')}</span></td><td>{new Date(w.requested_at).toLocaleString()}</td><td>{w.provider_reference||'—'}</td><td><button className="secondary-button" onClick={()=>{setSelected(w);setReference(w.provider_reference||'');setReason(w.rejection_reason||'');}}>Review</button></td></tr>):<tr><td colSpan={7} className="admin-empty">No withdrawals in this queue.</td></tr>}</tbody>
+    <div className="panel"><table className="table"><thead><tr><th>User</th><th>Method</th><th>Requested</th><th>Fee</th><th>Net</th><th>Status</th><th>Requested At</th><th>Reference</th><th>Action</th></tr></thead>
+      <tbody>{rows.length?rows.map(w=><tr key={w.id}><td><b>{w.username}</b><br/><span className="muted">{w.email}</span></td><td>{w.method_key}</td><td>{formatPoints(w.points)}</td><td>{formatPoints(w.fee_points||0)}</td><td>{formatPoints(w.net_points??w.points)}</td><td><span className={'status-pill '+(w.status==='paid'?'available':'review')}>{w.status.replace('_',' ')}</span></td><td>{new Date(w.requested_at).toLocaleString()}</td><td>{w.provider_reference||'—'}</td><td><button className="secondary-button" onClick={()=>{setSelected(w);setReference(w.provider_reference||'');setReason(w.rejection_reason||'');}}>Review</button></td></tr>):<tr><td colSpan={9} className="admin-empty">No withdrawals in this queue.</td></tr>}</tbody>
     </table></div>
 
     {selected&&<div className="modal-backdrop" onClick={()=>setSelected(null)}><div className="modal" onClick={e=>e.stopPropagation()}>
@@ -51,7 +51,7 @@ export default function WithdrawalsAdmin(){
       <div className="stats-grid">
         <div className="stat-card"><span>User</span><strong style={{fontSize:11}}>{selected.username}</strong></div>
         <div className="stat-card"><span>Method</span><strong style={{fontSize:11}}>{selected.method_key}</strong></div>
-        <div className="stat-card"><span>Points</span><strong>{formatPoints(selected.points)}</strong></div>
+        <div className="stat-card"><span>Requested</span><strong>{formatPoints(selected.points)}</strong><em>Fee {formatPoints(selected.fee_points||0)}</em></div>
         <div className="stat-card"><span>Status</span><strong style={{fontSize:10}}>{selected.status}</strong></div>
       </div>
       <div className="section-heading"><h2>Account Snapshot</h2><span>Captured at request time</span></div>

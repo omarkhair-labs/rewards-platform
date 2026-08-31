@@ -85,6 +85,9 @@ export type AdminWithdrawal = {
   method_key:string;
   account_snapshot:Record<string,unknown>;
   points:string|number;
+  fee_bps?:number;
+  fee_points?:string|number;
+  net_points?:string|number;
   status:'pending'|'in_review'|'processing'|'paid'|'rejected'|'cancelled'|'failed';
   provider_reference?:string|null;
   rejection_reason?:string|null;
@@ -146,4 +149,22 @@ export type WatchCampaign = {
   daily_limit:number;
   is_active:boolean;
   created_at:string;
+};
+
+export type AdminPayoutMethod = {
+  id:string;
+  method_key:string;
+  name:string;
+  mode:'manual'|'api';
+  provider_id?:string|null;
+  provider_slug?:string|null;
+  provider_name?:string|null;
+  instructions:string;
+  account_fields:Array<Record<string,unknown>>;
+  min_points:string|number;
+  fee_bps:number;
+  is_enabled:boolean;
+  sort_order:number;
+  created_at:string;
+  updated_at:string;
 };

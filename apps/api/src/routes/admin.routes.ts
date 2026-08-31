@@ -536,6 +536,81 @@ router.patch('/providers/:id', async (req: AuthedRequest, res) => {
 
 
 
+
+const payoutCatalogSchema = z.object({
+  methodKey:z.string().trim().regex(/^[a-z0-9-]+$/).max(50),
+  name:z.string().trim().min(2).max(100),
+  mode:z.enum(['manual','api']).default('manual'),
+  providerId:z.coerce.bigint().nullable().optional(),
+  instructions:z.string().trim().max(2000).default(''),
+  accountFields:z.array(z.record(z.unknown())).default([]),
+  minPoints:z.coerce.bigint().positive(),
+  feeBps:z.coerce.number().int().min(0).max(10000).default(0),
+  isEnabled:z.boolean().default(true),
+  sortOrder:z.coerce.number().int().min(0).max(100000).default(0)
+});
+
+router.get('/payout-methods',async(_req,res)=>{
+  const r=await pool.query(
+    `SELECT pm.*,p.slug provider_slug,p.name provider_name
+     FROM payout_method_catalog pm
+     LEFT JOIN providers p ON p.id=pm.provider_id
+     ORDER BY pm.sort_order ASC,pm.name ASC`
+  );
+  res.json(r.rows);
+});
+
+router.post('/payout-methods',async(req:AuthedRequest,res)=>{
+  const input=payoutCatalogSchema.parse(req.body);
+  const created=await tx(async client=>{
+    const r=await client.query(
+      `INSERT INTO payout_method_catalog
+       (method_key,name,mode,provider_id,instructions,account_fields,min_points,fee_bps,is_enabled,sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       RETURNING *`,
+      [
+        input.methodKey,input.name,input.mode,input.providerId?.toString()||null,input.instructions,
+        JSON.stringify(input.accountFields),input.minPoints.toString(),input.feeBps,input.isEnabled,input.sortOrder
+      ]
+    );
+    await audit(client,req.auth!.userId,'payout_method.create','payout_method',r.rows[0].id.toString(),input);
+    return r.rows[0];
+  });
+  res.status(201).json(created);
+});
+
+router.patch('/payout-methods/:id',async(req:AuthedRequest,res)=>{
+  const input=payoutCatalogSchema.partial().parse(req.body);
+  const id=String(req.params.id);
+  const updated=await tx(async client=>{
+    const current=await client.query('SELECT * FROM payout_method_catalog WHERE id=$1 FOR UPDATE',[id]);
+    if(!current.rows[0])throw new HttpError(404,'Payout method not found');
+    const before=current.rows[0];
+    const r=await client.query(
+      `UPDATE payout_method_catalog SET
+       method_key=$1,name=$2,mode=$3,provider_id=$4,instructions=$5,account_fields=$6,
+       min_points=$7,fee_bps=$8,is_enabled=$9,sort_order=$10,updated_at=NOW()
+       WHERE id=$11 RETURNING *`,
+      [
+        input.methodKey??before.method_key,
+        input.name??before.name,
+        input.mode??before.mode,
+        input.providerId!==undefined?input.providerId?.toString()||null:before.provider_id,
+        input.instructions??before.instructions,
+        JSON.stringify(input.accountFields??before.account_fields),
+        input.minPoints!==undefined?input.minPoints.toString():before.min_points,
+        input.feeBps??before.fee_bps,
+        input.isEnabled??before.is_enabled,
+        input.sortOrder??before.sort_order,
+        id
+      ]
+    );
+    await audit(client,req.auth!.userId,'payout_method.update','payout_method',id,input);
+    return r.rows[0];
+  });
+  res.json(updated);
+});
+
 const watchCampaignSchema = z.object({
   title:z.string().trim().min(2).max(200),
   mediaUrl:z.string().url().max(4000),
