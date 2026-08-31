@@ -38,7 +38,7 @@ export default function DashboardPage(){
     <div className="notice">Your account is active. Keep your profile and withdrawal details current before requesting a cashout.</div>
 
     <div className="stats-grid mt">
-      <div className="stat-card"><span>Available Balance</span><strong>{formatPoints(data.wallet.available_points)} Coins</strong><em>{formatPoints(data.wallet.held_points)} held</em></div>
+      <div className="stat-card"><span>Available Balance</span><strong>{formatPoints(data.wallet.available_points)} Coins</strong><em>{formatPoints(data.wallet.held_points)} held{Number(data.wallet.debt_points||0)>0?' · '+formatPoints(data.wallet.debt_points)+' debt':''}</em></div>
       <div className="stat-card"><span>Today</span><strong>{formatPoints(data.earnings.today)}</strong><em>Coins earned</em></div>
       <div className="stat-card"><span>This Week</span><strong>{formatPoints(data.earnings.week)}</strong><em>{formatPoints(data.earnings.month)} this month</em></div>
       <div className="stat-card"><span>Referrals</span><strong>{data.referrals}</strong><em>Invited members</em></div>
