@@ -14,6 +14,7 @@ const loginLimiter = rateLimit({
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   skipSuccessfulRequests: true,
+  skip: () => process.env.NODE_ENV === 'test',
   message: { error: 'Too many failed login attempts. Try again later.' }
 });
 
@@ -22,6 +23,7 @@ const registerLimiter = rateLimit({
   limit: 8,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
   message: { error: 'Too many registration attempts. Try again later.' }
 });
 
