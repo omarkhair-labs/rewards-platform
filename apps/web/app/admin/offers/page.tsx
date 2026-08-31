@@ -17,6 +17,7 @@ export default function OffersAdmin(){
   const [providers,setProviders]=useState<AdminProvider[]>([]);
   const [selected,setSelected]=useState<AdminOffer|null>(null);
   const [form,setForm]=useState<FormState>(emptyForm);
+  const [showForm,setShowForm]=useState(false);
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
@@ -32,6 +33,7 @@ export default function OffersAdmin(){
   useEffect(()=>{void load();},[load]);
 
   function open(offer?:AdminOffer){
+    setShowForm(true);
     if(offer){
       setSelected(offer);
       setForm({
@@ -54,7 +56,7 @@ export default function OffersAdmin(){
     try{
       if(selected)await apiFetch('/api/admin/offers/'+selected.id,{method:'PATCH',body:JSON.stringify(body)});
       else await apiFetch('/api/admin/offers',{method:'POST',body:JSON.stringify(body)});
-      setSelected(null);setForm(emptyForm);await load();
+      setShowForm(false);setSelected(null);setForm(emptyForm);await load();
     }catch(err){setError(err instanceof Error?err.message:'Failed to save offer');}
     finally{setSaving(false);}
   }
@@ -78,7 +80,7 @@ export default function OffersAdmin(){
       <tbody>{offers.length?offers.map(o=><tr key={o.id}><td><b>{o.title}</b><br/><span className="muted">{o.external_id||'Internal'}</span></td><td>{o.provider_name||o.provider_slug||'Manual'}</td><td>{o.category}</td><td>{formatPoints(o.reward_points)}</td><td>{o.is_featured?'Yes':'No'}</td><td><span className={'status-pill '+(o.is_active?'available':'review')}>{o.is_active?'active':'disabled'}</span></td><td><div className="admin-actions"><button className="secondary-button" onClick={()=>open(o)}>Edit</button><button className="secondary-button" onClick={()=>void toggle(o,'isFeatured')}>{o.is_featured?'Unfeature':'Feature'}</button><button className={o.is_active?'danger-button':'success-button'} onClick={()=>void toggle(o,'isActive')}>{o.is_active?'Disable':'Enable'}</button></div></td></tr>):<tr><td colSpan={7} className="admin-empty">No offers configured.</td></tr>}</tbody>
     </table></div>
 
-    {(selected!==null||form!==emptyForm)&&<div className="modal-backdrop" onClick={()=>{setSelected(null);setForm(emptyForm);}}><form className="modal" onSubmit={save} onClick={e=>e.stopPropagation()}>
+    {showForm&&<div className="modal-backdrop" onClick={()=>{setShowForm(false);setSelected(null);setForm(emptyForm);}}><form className="modal" onSubmit={save} onClick={e=>e.stopPropagation()}>
       <h2>{selected?'Edit Offer':'Create Offer'}</h2>
       <div className="form-grid">
         <div className="field"><label>Title</label><input required value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/></div>
@@ -96,7 +98,7 @@ export default function OffersAdmin(){
         <label style={{fontSize:8}}><input type="checkbox" checked={form.isFeatured} onChange={e=>setForm({...form,isFeatured:e.target.checked})}/> Featured</label>
         <label style={{fontSize:8}}><input type="checkbox" checked={form.isActive} onChange={e=>setForm({...form,isActive:e.target.checked})}/> Active</label>
       </div>
-      <div className="modal-actions"><button type="button" className="secondary-button" onClick={()=>{setSelected(null);setForm(emptyForm);}}>Cancel</button><button disabled={saving} className="primary-button">{saving?'Saving...':'Save Offer'}</button></div>
+      <div className="modal-actions"><button type="button" className="secondary-button" onClick={()=>{setShowForm(false);setSelected(null);setForm(emptyForm);}}>Cancel</button><button disabled={saving} className="primary-button">{saving?'Saving...':'Save Offer'}</button></div>
     </form></div>}
   </>;
 }
