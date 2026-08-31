@@ -50,8 +50,9 @@ export default function WatchPage(){
   async function start(campaign:WatchCampaign){
     setWorking(true);setError('');setSuccess('');
     try{
-      const result=await apiFetch<{sessionId:string;minimumSeconds:number}>('/api/watch/'+campaign.id+'/start',{method:'POST'});
-      setActive({campaignId:campaign.id,sessionId:result.sessionId,endsAt:Date.now()+result.minimumSeconds*1000,durationSeconds:result.minimumSeconds,mediaUrl:campaign.media_url});
+      const result=await apiFetch<{sessionId:string;minimumSeconds:number;remainingSeconds?:number;resumed?:boolean}>('/api/watch/'+campaign.id+'/start',{method:'POST'});
+      const remainingSeconds=result.remainingSeconds??result.minimumSeconds;
+      setActive({campaignId:campaign.id,sessionId:result.sessionId,endsAt:Date.now()+remainingSeconds*1000,durationSeconds:Math.max(1,remainingSeconds),mediaUrl:campaign.media_url});
       setNow(Date.now());
       window.open(campaign.media_url,'_blank','noopener,noreferrer');
     }catch(err){setError(err instanceof Error?err.message:'Unable to start campaign');}
