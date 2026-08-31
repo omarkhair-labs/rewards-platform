@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   Activity, BadgeDollarSign, Boxes, ClipboardCheck, FileCheck2, Gauge,
-  ListTodo, LogOut, ShieldAlert, SlidersHorizontal, UsersRound, Crown, PlayCircle
+  ListTodo, LogOut, ShieldAlert, SlidersHorizontal, UsersRound, Crown, PlayCircle, CreditCard
 } from 'lucide-react';
 import { apiFetch, clearToken, getToken } from '@/lib/api';
 import type { Me } from '@/lib/types';
@@ -17,6 +17,7 @@ const nav = [
   {href:'/admin/tasks',label:'Tasks',icon:ListTodo},
   {href:'/admin/proofs',label:'Proof Review',icon:FileCheck2},
   {href:'/admin/withdrawals',label:'Withdrawals',icon:BadgeDollarSign},
+  {href:'/admin/payout-methods',label:'Payout Methods',icon:CreditCard},
   {href:'/admin/providers',label:'Providers',icon:SlidersHorizontal},
   {href:'/admin/watch',label:'Watch & Earn',icon:PlayCircle},
   {href:'/admin/settings',label:'Levels & Premium',icon:Crown},
