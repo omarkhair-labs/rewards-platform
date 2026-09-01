@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import {
+  ArrowRight,
   BadgeDollarSign,
   Bell,
   Boxes,
@@ -13,6 +14,8 @@ import {
   ListTodo,
   LogOut,
   Menu,
+  MessageCircle,
+  Send,
   Settings,
   UserRound,
   UsersRound,
@@ -47,6 +50,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen,setSidebarOpen] = useState(false);
   const [notificationsOpen,setNotificationsOpen] = useState(false);
   const [accountOpen,setAccountOpen] = useState(false);
+  const [walletOpen,setWalletOpen] = useState(false);
+  const [supportOpen,setSupportOpen] = useState(false);
+  const [supportInput,setSupportInput] = useState('');
+  const [supportMessages,setSupportMessages] = useState([{id:'welcome',from:'support',text:'Hi! How can we help with your rewards account today?'}]);
   const [notifications,setNotifications] = useState<Notification[]>([]);
 
   useEffect(()=>{
@@ -75,7 +82,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return ()=>{ active=false; };
   },[router]);
 
-  useEffect(()=>{setSidebarOpen(false);setNotificationsOpen(false);setAccountOpen(false);},[pathname]);
+  useEffect(()=>{setSidebarOpen(false);setNotificationsOpen(false);setAccountOpen(false);setWalletOpen(false);},[pathname]);
 
   function logout(){
     clearToken();
@@ -86,6 +93,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if(item.read_at)return;
     await apiFetch(`/api/account/notifications/${item.id}/read`,{method:'PATCH'});
     setNotifications(current=>current.map(row=>row.id===item.id?{...row,read_at:new Date().toISOString()}:row));
+  }
+
+  function sendSupportMessage(event:FormEvent){
+    event.preventDefault();
+    const text=supportInput.trim();
+    if(!text)return;
+    setSupportMessages(current=>[...current,{id:`member-${Date.now()}`,from:'member',text},{id:`support-${Date.now()}`,from:'support',text:'Thanks — your message is in the demo support queue.'}]);
+    setSupportInput('');
   }
 
   const username = me?.username || 'Member';
@@ -118,13 +133,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
         <div className="top-actions">
-          <Link className="wallet-chip" href="/cashout" aria-label={`${balance} coins available`}><span>🪙</span><b>{balance}</b></Link>
-          <button className="chrome-button notification-trigger" aria-label={`Notifications${unread?` (${unread} unread)`:''}`} aria-expanded={notificationsOpen} onClick={()=>{setNotificationsOpen(v=>!v);setAccountOpen(false);}}><Bell size={20}/>{unread>0&&<span className="notification-count">{unread}</span>}</button>
-          <button className="chrome-button" aria-label="Account menu" aria-expanded={accountOpen} onClick={()=>{setAccountOpen(v=>!v);setNotificationsOpen(false);}}><UserRound size={21}/></button>
+          <button className="wallet-chip" aria-label={`${balance} coins available. Open wallet.`} aria-expanded={walletOpen} onClick={()=>{setWalletOpen(v=>!v);setNotificationsOpen(false);setAccountOpen(false);}}><span>🪙</span><b>{balance}</b></button>
+          <button className="chrome-button notification-trigger" aria-label={`Notifications${unread?` (${unread} unread)`:''}`} aria-expanded={notificationsOpen} onClick={()=>{setNotificationsOpen(v=>!v);setAccountOpen(false);setWalletOpen(false);}}><Bell size={20}/>{unread>0&&<span className="notification-count">{unread}</span>}</button>
+          <button className="chrome-button" aria-label="Account menu" aria-expanded={accountOpen} onClick={()=>{setAccountOpen(v=>!v);setNotificationsOpen(false);setWalletOpen(false);}}><UserRound size={21}/></button>
         </div>
       </header>
 
-      {(notificationsOpen||accountOpen)&&<button className="popover-scrim" aria-label="Close open menu" onClick={()=>{setNotificationsOpen(false);setAccountOpen(false);}} />}
+      {(notificationsOpen||accountOpen||walletOpen)&&<button className="popover-scrim" aria-label="Close open menu" onClick={()=>{setNotificationsOpen(false);setAccountOpen(false);setWalletOpen(false);}} />}
+
+      {walletOpen&&<section className="top-popover wallet-popover" aria-label="Wallet summary">
+        <div className="popover-head"><div><b>My Wallet</b><span>Live account balance</span></div><span className="status-pill available">Available</span></div>
+        <div className="wallet-popover-grid">
+          <div><span>Available</span><b>{balance}</b><small>Coins ready to use</small></div>
+          <div><span>Held</span><b>{formatPoints(me.held_points||0)}</b><small>Cashouts in review</small></div>
+          <div><span>Lifetime earned</span><b>{formatPoints(me.lifetime_earned_points||0)}</b><small>All credited rewards</small></div>
+        </div>
+        {Number(me.debt_points||0)>0&&<div className="wallet-warning">Cashout is locked until {formatPoints(me.debt_points)} debt Coins are settled.</div>}
+        <div className="wallet-popover-actions"><Link className="secondary-button" href="/profile">View history</Link><Link className="primary-button" href="/cashout">Cashout <ArrowRight size={14}/></Link></div>
+      </section>}
 
       {notificationsOpen&&<section className="top-popover notification-popover" aria-label="Notifications">
         <div className="popover-head"><div><b>Notifications</b><span>{unread} unread</span></div>{unread>0&&<button onClick={()=>void Promise.all(notifications.filter(n=>!n.read_at).map(markRead))}>Mark all read</button>}</div>
@@ -178,6 +204,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <nav className="mobile-nav" aria-label="Quick navigation">
         {mobileNav.map(({href,label,icon:Icon})=><Link key={href} href={href} className={pathname===href?'active':''}><Icon size={21}/><span>{label}</span></Link>)}
       </nav>
+
+      <button className="support-trigger" aria-label={supportOpen?'Close live support':'Open live support'} aria-expanded={supportOpen} onClick={()=>setSupportOpen(value=>!value)}>{supportOpen?<X size={22}/>:<MessageCircle size={22}/>}</button>
+      {supportOpen&&<section className="support-drawer" role="dialog" aria-modal="false" aria-label="Live support">
+        <div className="support-head"><div><b>Live Support</b><span><i/> Online · typically replies quickly</span></div><button aria-label="Close support" onClick={()=>setSupportOpen(false)}><X size={18}/></button></div>
+        <div className="support-messages">{supportMessages.map(message=><div key={message.id} className={`support-message ${message.from}`}>{message.text}</div>)}</div>
+        <div className="support-quick"><button onClick={()=>setSupportInput('I need help with a cashout')}>Cashout help</button><button onClick={()=>setSupportInput('I need help with a task proof')}>Task proof</button></div>
+        <form className="support-composer" onSubmit={sendSupportMessage}><label className="sr-only" htmlFor="support-message">Message support</label><input id="support-message" value={supportInput} onChange={event=>setSupportInput(event.target.value)} maxLength={200} placeholder="Type your message..."/><button aria-label="Send message"><Send size={17}/></button></form>
+      </section>}
     </div>
   );
 }

@@ -46,7 +46,7 @@ npm run dev:web
 
 ## Standalone frontend preview
 
-The complete member experience can be reviewed without the API by starting the web app with `NEXT_PUBLIC_DEMO_MODE=true`. Demo mode follows the same frontend contracts and simulates member data and mutations; set it to `false` and configure `NEXT_PUBLIC_API_URL` when handing the interface to another API team. See `docs/FRONTEND_API_HANDOFF.md` for the route contract map.
+The complete member and admin experiences can be reviewed without the API by starting the web app with `NEXT_PUBLIC_DEMO_MODE=true`. Use `demo@rewards.local` / `Demo2026!` for the member portal or `admin@rewards.local` / `Admin2026!` for the operations console. Demo mode follows the same frontend contracts and simulates reads and mutations; set it to `false` and configure `NEXT_PUBLIC_API_URL` when handing the interface to another API team. See `docs/FRONTEND_API_HANDOFF.md` for the route contract map.
 
 ## Demo and first admin
 

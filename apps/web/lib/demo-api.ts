@@ -21,6 +21,17 @@ let demoUser: Me = {
   debt_points: 0, lifetime_earned_points: 18750
 };
 
+const demoAdmin: Me = {
+  id:'admin-1',username:'demo.admin',email:'admin@rewards.local',role:'admin',status:'active',
+  full_name:'Demo Administrator',country_code:'EG',bio:'Operations console reviewer',referral_code:'ADMIN2026',
+  level:6,rank:'Diamond',is_premium:true,available_points:125000,held_points:0,debt_points:0,lifetime_earned_points:640000
+};
+
+function currentDemoUser() {
+  if (typeof window !== 'undefined' && window.localStorage.getItem('rewards_token') === 'demo-admin-session') return demoAdmin;
+  return demoUser;
+}
+
 const offers: Offer[] = [
   {id:1,title:'Wordplay Adventure',description:'Install the game and complete the starter journey.',category:'Apps',reward_points:1750,difficulty:'Easy',estimated_minutes:5,is_featured:true,provider_slug:'lootably',provider_name:'Rewardly'},
   {id:2,title:'Grand Win',description:'Create an account and complete the required onboarding steps.',category:'Signups',reward_points:27930,difficulty:'Easy',estimated_minutes:5,is_featured:true,provider_slug:'lootably',provider_name:'Play Partners'},
@@ -99,8 +110,17 @@ export async function demoApiFetch<T>(path: string, options: RequestInit = {}): 
   const clean = path.split('?')[0];
   const body = bodyOf(options);
 
-  if (clean === '/api/auth/login' || clean === '/api/auth/register') return {token:'demo-session',user:demoUser} as T;
-  if (clean === '/api/auth/me') return {...demoUser} as T;
+  if (clean === '/api/auth/login') {
+    const admin = String(body.email||'').toLowerCase() === 'admin@rewards.local';
+    return {token:admin?'demo-admin-session':'demo-member-session',user:admin?demoAdmin:demoUser} as T;
+  }
+  if (clean === '/api/auth/register') return {token:'demo-member-session',user:demoUser} as T;
+  if (clean === '/api/auth/me') return {...currentDemoUser()} as T;
+  if (clean.startsWith('/api/admin/')) {
+    if (currentDemoUser().role !== 'admin') throw new Error('Admin demo credentials are required.');
+    const { demoAdminApiFetch } = await import('./demo-admin-api');
+    return demoAdminApiFetch<T>(path, options);
+  }
   if (clean === '/api/account/dashboard') return dashboard() as T;
   if (clean === '/api/account/transactions') return transactions as T;
   if (clean === '/api/account/level-progress') return {level:2,rank:'Bronze',lifetimePoints:18750,currentThreshold:10000,nextLevel:{level:3,rank:'Silver',min_lifetime_points:25000}} as T;
