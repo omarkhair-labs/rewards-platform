@@ -18,7 +18,8 @@ export default function LoginPage(){
   const [loading,setLoading]=useState(false);
 
   useEffect(()=>{
-    if (getToken()) router.replace('/dashboard');
+    const token=getToken();
+    if (token) router.replace(DEMO_MODE&&token==='demo-admin-session'?'/admin':'/dashboard');
   },[router]);
 
   async function submit(e:FormEvent){
@@ -32,7 +33,7 @@ export default function LoginPage(){
         body:JSON.stringify({email,password})
       });
       setToken(result.token);
-      router.replace('/dashboard');
+      router.replace(result.user.role==='admin'||result.user.role==='moderator'?'/admin':'/dashboard');
     }catch(err){
       setError(err instanceof Error ? err.message : 'Unable to sign in');
     }finally{
@@ -44,7 +45,15 @@ export default function LoginPage(){
     <form className="panel form-card" style={{width:'min(430px,94vw)'}} onSubmit={submit}>
       <div className="center"><div className="brand-mark" style={{margin:'0 auto 10px'}}>R</div><h1 style={{fontSize:18,marginBottom:4}}>Welcome back</h1><p className="muted" style={{fontSize:8}}>Sign in to continue to your rewards account.</p></div>
       {error&&<div className="notice" style={{borderColor:'rgba(255,90,126,.4)',background:'rgba(120,20,55,.16)',color:'#ff9bb5'}}>{error}</div>}
-      {DEMO_MODE&&<div className="notice">Interactive preview is active. Sign in with demo@rewards.local / Demo2026! (or any valid email and password).</div>}
+      {DEMO_MODE&&<div className="notice demo-credentials">
+        <b>Interactive preview</b>
+        <span>Member: demo@rewards.local / Demo2026!</span>
+        <span>Admin: admin@rewards.local / Admin2026!</span>
+        <div className="demo-login-actions">
+          <button type="button" className="secondary-button" onClick={()=>{setEmail('demo@rewards.local');setPassword('Demo2026!');}}>Use Member Demo</button>
+          <button type="button" className="secondary-button" onClick={()=>{setEmail('admin@rewards.local');setPassword('Admin2026!');}}>Use Admin Demo</button>
+        </div>
+      </div>}
       <div className="form-grid mt">
         <div className="field"><label>Email</label><input required type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email"/></div>
         <div className="field"><label>Password</label><input required type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password"/></div>

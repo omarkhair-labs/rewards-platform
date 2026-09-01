@@ -130,6 +130,8 @@
 .account-summary small { margin-top: 3px; color: #aaa8bc; font-size: 10px; }
 .account-popover > a,.account-popover > button { width: 100%; min-height: 42px; padding: 0 11px; display: flex; align-items: center; gap: 9px; border: 0; border-radius: 9px; color: #deddea; background: transparent; font-size: 12px; cursor: pointer; }
 .account-popover > a:hover,.account-popover > button:hover { background: rgba(26, 146, 226, .16); color: #fff; }
+.wallet-popover{width:min(430px,calc(100vw - 24px))}.wallet-popover-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px}.wallet-popover-grid>div{padding:11px;border:1px solid rgba(151,127,218,.3);border-radius:11px;background:rgba(14,16,30,.5)}.wallet-popover-grid span,.wallet-popover-grid small{display:block;color:#9da2bf;font-size:8px}.wallet-popover-grid b{display:block;margin:5px 0;color:#fff;font-size:16px}.wallet-warning{margin:0 12px 10px;padding:9px;border:1px solid rgba(255,105,126,.35);border-radius:9px;background:rgba(112,28,48,.25);color:#ffb2c0;font-size:9px}.wallet-popover-actions{display:flex;justify-content:flex-end;gap:8px;padding:0 12px 12px}.wallet-popover-actions a{display:inline-flex;align-items:center;gap:6px}
+.support-trigger{position:fixed;right:22px;bottom:22px;z-index:82;width:52px;height:52px;display:grid;place-items:center;border:1px solid #258ee1;border-radius:50%;background:linear-gradient(180deg,#1999ed,#0872c8);color:#fff;box-shadow:0 10px 30px rgba(0,105,205,.42);cursor:pointer}.support-drawer{position:fixed;right:22px;bottom:84px;z-index:82;width:min(360px,calc(100vw - 24px));overflow:hidden;border:2px solid var(--member-border);border-radius:17px;background:linear-gradient(155deg,#3b3855,#242338);box-shadow:0 24px 70px rgba(0,0,0,.58)}.support-head{min-height:62px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(132,100,188,.4)}.support-head b,.support-head span{display:block}.support-head b{font-size:14px}.support-head span{margin-top:4px;color:#aaa8bc;font-size:9px}.support-head i{display:inline-block;width:7px;height:7px;margin-right:4px;border-radius:50%;background:#42df9c;box-shadow:0 0 8px rgba(66,223,156,.7)}.support-head button{display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:9px;background:rgba(255,255,255,.06);color:#fff;cursor:pointer}.support-messages{height:250px;padding:13px;display:flex;flex-direction:column;gap:9px;overflow-y:auto;background:rgba(7,8,16,.34)}.support-message{max-width:82%;padding:9px 11px;border-radius:12px;font-size:10px;line-height:1.45}.support-message.support{align-self:flex-start;background:#34314b;color:#deddea;border-bottom-left-radius:4px}.support-message.member{align-self:flex-end;background:#1288db;color:#fff;border-bottom-right-radius:4px}.support-quick{padding:9px 11px;display:flex;gap:6px;border-top:1px solid rgba(132,100,188,.26)}.support-quick button{border:1px solid rgba(74,166,229,.34);border-radius:999px;background:rgba(20,129,202,.12);color:#8fd0fb;padding:5px 8px;font-size:8px;cursor:pointer}.support-composer{padding:10px;display:grid;grid-template-columns:1fr 38px;gap:7px}.support-composer input{min-width:0;border:1px solid rgba(132,100,188,.42);border-radius:10px;background:#171628;color:#fff;padding:9px 10px;font-size:10px}.support-composer button{display:grid;place-items:center;border:0;border-radius:10px;background:#1288db;color:#fff;cursor:pointer}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 .sidebar {
   position: fixed;
@@ -352,6 +354,8 @@
   border: 1px solid rgba(31, 215, 152, .38);
   color: #aaf0d4;
 }
+
+.demo-credentials{display:grid;gap:6px}.demo-credentials span{font-size:8px}.demo-login-actions{display:flex;gap:7px;flex-wrap:wrap}.demo-login-actions button{flex:1;min-width:130px}
 
 .app-shell .mt { margin-top: 22px; }
 .section-heading { margin: 30px 0 14px; }
@@ -594,6 +598,8 @@
   .top-actions { gap: 6px; }
   .top-popover { right: 7px; top: 61px; }
   .account-popover { width: min(270px, calc(100vw - 14px)); }
+  .wallet-popover-grid{grid-template-columns:1fr}.wallet-popover-grid>div{display:grid;grid-template-columns:1fr auto;align-items:center}.wallet-popover-grid>div small{grid-column:1/-1}
+  .support-trigger{right:12px;bottom:79px}.support-drawer{right:7px;bottom:138px}
   .hero-title { margin-bottom: 22px; }
   .hero-title h1 { font-size: 31px; }
   .hero-title p { font-size: 14px; }
