@@ -99,12 +99,14 @@ export default function CashoutPage(){
   if(error&&!dashboard)return <ErrorPanel message={error} retry={()=>void load()}/>;
 
   const balance=dashboard?.wallet.available_points||0;
+  const debt=dashboard?.wallet.debt_points||0;
 
   return <>
     <div className="cashout-hero">
       <h1>Rewards Cashout</h1>
       <p className="muted" style={{fontSize:8}}>Withdraw your available coins using an enabled payout method.</p>
       <div className="coin-display">💎 {formatPoints(balance)} Coins</div>
+      {Number(debt)>0&&<div className="notice mt" style={{borderColor:'rgba(255,190,70,.4)',color:'#ffd47a'}}>Cashout is locked until {formatPoints(debt)} Coins of reversed-reward debt are settled by future earnings.</div>}
     </div>
 
     {error&&<div className="notice" style={{borderColor:'rgba(255,90,126,.4)',color:'#ff9bb5'}}>{error}</div>}

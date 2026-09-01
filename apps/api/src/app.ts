@@ -29,13 +29,23 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
-app.use(rateLimit({
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  skip: req => req.path.startsWith('/api/postbacks/')
-}));
+  skip: req => req.path.startsWith('/api/postbacks/') || /^\/api\/providers\/[^/]+\/postback$/.test(req.path)
+});
+
+const postbackLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 600,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Postback rate limit exceeded' }
+});
+
+app.use(apiLimiter);
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
@@ -47,7 +57,7 @@ app.use('/api/surveys', surveysRoutes);
 app.use('/api/withdrawals', withdrawalsRoutes);
 app.use('/api/providers', providersRoutes);
 app.use('/api/integrations', integrationsRoutes);
-app.use('/api/postbacks', officialPostbackRoutes);
+app.use('/api/postbacks', postbackLimiter, officialPostbackRoutes);
 app.use('/api/watch', watchRoutes);
 app.use('/api/uploads', uploadsRoutes);
 app.use('/api/admin', adminRoutes);

@@ -8,7 +8,7 @@ Production-oriented foundation for a GPT / rewards platform with CovenCash-style
 - PostgreSQL canonical schema
 - Argon2id password hashing
 - JWT authentication
-- Immutable wallet ledger with available + held balances
+- Immutable wallet ledger with available + held + reversal-debt balances
 - Idempotent wallet credit / debit / hold / release
 - Offers + provider abstraction
 - Signed provider postback foundation
@@ -46,20 +46,26 @@ The implementation uses original code and branding while matching the requested 
 
 ## Security rules
 
-- No provider callback credits rewards without signature verification.
+- JWTs pin HS256, issuer and audience and every authenticated request re-checks the database account role/status.
+- Login and registration have dedicated throttles; targeted failed logins create fraud events.
+- Official and generic provider callbacks are rate-limited and cannot credit without signature verification.
+- Generic callback signatures bind transaction, user, reward amount **and status**, preventing a signed credit from being replayed as a reversal.
 - Every wallet mutation is idempotent and recorded in `wallet_entries`.
-- Cashout reserves balance before operator processing.
-- Task rewards are credited only after moderation approval.
-- Admin actions are audit logged.
+- Chargebacks can create explicit wallet debt instead of failing when a reward was already spent; cashout is locked until that debt is settled by later credits or released held funds.
+- Cashout reserves balance before operator processing and uses a strict pending → review → processing → paid lifecycle.
+- Paid withdrawals require an operator payment reference; reject/fail transitions require a reason.
+- Moderators can work review queues, but financial/configuration mutations are admin-only.
+- Task rewards are credited only after moderation approval and active duplicate submissions are database-constrained.
+- Configurable outbound URLs are restricted to HTTP(S).
+- Admin actions are audit logged with BigInt-safe serialization and provider secrets redacted from audit metadata.
 
 ## Next build lanes
 
-1. Automated payout adapters where provider credentials exist.
-2. Fraud hardening and security rules.
-3. E2E tests and database integration tests.
-4. Demo/seed environment and admin bootstrap.
-5. Production deployment.
-6. CovenCash parity QA screen-by-screen.
+1. Demo/seed environment and admin bootstrap.
+2. Production deployment configuration.
+3. Automated payout adapters where provider credentials exist.
+4. CovenCash parity QA screen-by-screen.
+5. Production smoke/E2E pass against the deployed environment.
 
 
 ## Proof file storage
@@ -70,3 +76,10 @@ File proof tasks use an S3-compatible object store (Cloudflare R2, S3, MinIO, et
 ## Payout catalog
 
 Cashout methods are no longer hardcoded in the web UI. Enabled methods are stored in `payout_method_catalog`, including account field requirements, minimum points, fee basis points, operator/API mode and ordering. Each withdrawal snapshots its fee and net points so later catalog changes cannot rewrite historical payout economics.
+
+
+## Integration tests
+
+`npm test` runs the API security/integrity suite against PostgreSQL. The suite rebuilds an isolated test schema and covers JWT claims/RBAC, task proof credit idempotency, repeatable tasks, withdrawal state transitions and balance holds, signed provider credit/reversal behavior, reversal debt, oversized rewards, concurrent Watch & Earn completion, unsafe outbound URLs and fraud-event logging.
+
+The CI workflow provisions PostgreSQL 16, audits production dependencies, builds API + web, then runs the integration suite.

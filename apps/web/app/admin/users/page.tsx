@@ -42,8 +42,8 @@ export default function UsersAdmin(){
     </div>
     {error&&<div className="notice" style={{borderColor:'rgba(255,90,126,.4)',color:'#ff9bb5'}}>{error}</div>}
     <div className="panel">
-      <table className="table"><thead><tr><th>User</th><th>Role</th><th>Status</th><th>Available</th><th>Held</th><th>Lifetime</th><th>Premium</th><th>Created</th></tr></thead>
-      <tbody>{users.length?users.map(u=><tr key={u.id} className="clickable-row" onClick={()=>setSelected(u)}><td><b>{u.username}</b><br/><span className="muted">{u.email}</span></td><td>{u.role}</td><td><span className={'status-pill '+(u.status==='active'?'available':'review')}>{u.status}</span></td><td>{formatPoints(u.available_points)}</td><td>{formatPoints(u.held_points)}</td><td>{formatPoints(u.lifetime_earned_points)}</td><td>{u.is_premium?'Yes':'No'}</td><td>{new Date(u.created_at).toLocaleDateString()}</td></tr>):<tr><td colSpan={8} className="admin-empty">No users found.</td></tr>}</tbody></table>
+      <table className="table"><thead><tr><th>User</th><th>Role</th><th>Status</th><th>Available</th><th>Held</th><th>Debt</th><th>Lifetime</th><th>Premium</th><th>Created</th></tr></thead>
+      <tbody>{users.length?users.map(u=><tr key={u.id} className="clickable-row" onClick={()=>setSelected(u)}><td><b>{u.username}</b><br/><span className="muted">{u.email}</span></td><td>{u.role}</td><td><span className={'status-pill '+(u.status==='active'?'available':'review')}>{u.status}</span></td><td>{formatPoints(u.available_points)}</td><td>{formatPoints(u.held_points)}</td><td>{formatPoints(u.debt_points)}</td><td>{formatPoints(u.lifetime_earned_points)}</td><td>{u.is_premium?'Yes':'No'}</td><td>{new Date(u.created_at).toLocaleDateString()}</td></tr>):<tr><td colSpan={9} className="admin-empty">No users found.</td></tr>}</tbody></table>
     </div>
 
     {selected&&<div className="modal-backdrop" onClick={()=>setSelected(null)}><div className="modal" onClick={e=>e.stopPropagation()}>
@@ -51,6 +51,7 @@ export default function UsersAdmin(){
       <div className="stats-grid">
         <div className="stat-card"><span>Available</span><strong>{formatPoints(selected.available_points)}</strong></div>
         <div className="stat-card"><span>Held</span><strong>{formatPoints(selected.held_points)}</strong></div>
+        <div className="stat-card"><span>Debt</span><strong>{formatPoints(selected.debt_points)}</strong><em>{Number(selected.debt_points||0)>0?'Cashout locked':'Clear'}</em></div>
         <div className="stat-card"><span>Level</span><strong>{selected.level}</strong><em>{selected.rank}</em></div>
         <div className="stat-card"><span>Premium</span><strong>{selected.is_premium?'Yes':'No'}</strong><em>{selected.premium_expires_at?new Date(selected.premium_expires_at).toLocaleDateString():'No expiry'}</em></div>
       </div>

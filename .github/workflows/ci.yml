@@ -1,13 +1,39 @@
 name: CI
+# Blacksmith CI
 
 on:
   push:
-    branches: [main, build/**]
+    branches: [main]
   pull_request:
 
 jobs:
   api-build:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rewards_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d rewards_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/rewards_test
+      JWT_SECRET: test-only-jwt-secret-with-at-least-32-characters
+      JWT_ISSUER: rewards-api-test
+      JWT_AUDIENCE: rewards-web-test
+      APP_ORIGIN: http://localhost:3000
+      PUBLIC_API_URL: http://localhost:4000
+      MIN_WITHDRAWAL_POINTS: 5000
+      MAX_SINGLE_REWARD_POINTS: 10000000
+      REFERRAL_COMMISSION_BPS: 1000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,4 +42,7 @@ jobs:
       - run: npm install
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
-      - run: npm run build
+      - name: Build API and web
+        run: npm run build
+      - name: Run integration tests
+        run: npm test

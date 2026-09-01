@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { pool, tx } from '../db.js';
@@ -7,6 +8,25 @@ import { HttpError } from '../http.js';
 
 const router = Router();
 
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  skip: () => process.env.NODE_ENV === 'test',
+  message: { error: 'Too many failed login attempts. Try again later.' }
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 8,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
+  message: { error: 'Too many registration attempts. Try again later.' }
+});
+
 const registerSchema = z.object({
   username: z.string().trim().min(3).max(40),
   email: z.string().email().transform(v => v.trim().toLowerCase()),
@@ -14,7 +34,7 @@ const registerSchema = z.object({
   referralCode: z.string().trim().max(64).optional()
 });
 
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   const input = registerSchema.parse(req.body);
 
   const user = await tx(async client => {
@@ -60,12 +80,25 @@ const loginSchema = z.object({
   password: z.string().min(1)
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const input = loginSchema.parse(req.body);
   const result = await pool.query('SELECT * FROM users WHERE email=$1', [input.email]);
   const user = result.rows[0];
 
-  if (!user || !(await verifyPassword(user.password_hash, input.password))) {
+  const passwordValid = user ? await verifyPassword(user.password_hash, input.password) : false;
+  if (!user || !passwordValid) {
+    if (user) {
+      await pool.query(
+        `INSERT INTO fraud_events(user_id,event_type,severity,ip_address,user_agent,metadata)
+         VALUES ($1,'login_failed','medium',$2,$3,$4)`,
+        [
+          user.id,
+          req.ip || null,
+          req.headers['user-agent'] || null,
+          JSON.stringify({ reason: 'invalid_password' })
+        ]
+      );
+    }
     throw new HttpError(401, 'Invalid email or password');
   }
   if (user.status !== 'active') throw new HttpError(403, 'Account unavailable');
@@ -92,7 +125,7 @@ router.get('/me', requireAuth, async (req: AuthedRequest, res) => {
             u.referral_code,u.level,u.rank,
             (u.is_premium AND (u.premium_expires_at IS NULL OR u.premium_expires_at>NOW())) AS is_premium,
             u.premium_expires_at,
-            w.available_points,w.held_points,w.lifetime_earned_points
+            w.available_points,w.held_points,w.debt_points,w.lifetime_earned_points
      FROM users u
      LEFT JOIN wallet_accounts w ON w.user_id=u.id
      WHERE u.id=$1`,

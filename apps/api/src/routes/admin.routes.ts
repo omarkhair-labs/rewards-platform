@@ -5,15 +5,24 @@ import { requireRole, type AuthedRequest } from '../auth.js';
 import { HttpError } from '../http.js';
 import { Rewards } from '../rewards.js';
 import { Wallet } from '../wallet.js';
+import { env } from '../config/env.js';
 
 const router = Router();
 router.use(requireRole('admin','moderator'));
+
+const httpUrl = (maxLength = 4000) => z.string().url().max(maxLength).refine(value => {
+  try {
+    return ['http:','https:'].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}, 'URL must use http or https');
 
 async function audit(client: any, actor: bigint, action: string, entityType: string, entityId: string | null, metadata: unknown = {}) {
   await client.query(
     `INSERT INTO audit_logs(actor_user_id,action,entity_type,entity_id,metadata)
      VALUES ($1,$2,$3,$4,$5)`,
-    [actor.toString(), action, entityType, entityId, JSON.stringify(metadata)]
+    [actor.toString(), action, entityType, entityId, JSON.stringify(metadata, (_key,value) => typeof value === 'bigint' ? value.toString() : value)]
   );
 }
 
@@ -50,7 +59,7 @@ router.get('/users', async (req, res) => {
   let sql = `
     SELECT u.id,u.username,u.email,u.role,u.status,u.level,u.rank,u.is_premium,u.premium_expires_at,
            u.withdrawal_locked_at,u.withdrawal_lock_reason,u.created_at,
-           w.available_points,w.held_points,w.lifetime_earned_points
+           w.available_points,w.held_points,w.debt_points,w.lifetime_earned_points
     FROM users u LEFT JOIN wallet_accounts w ON w.user_id=u.id
   `;
   if (q) {
@@ -71,7 +80,7 @@ const userPatch = z.object({
   withdrawalLockReason: z.string().trim().max(500).optional()
 });
 
-router.patch('/users/:id', async (req: AuthedRequest, res) => {
+router.patch('/users/:id', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = userPatch.parse(req.body);
   const targetId = String(req.params.id);
   const updated = await tx(async client => {
@@ -116,8 +125,8 @@ const taskSchema = z.object({
   title: z.string().trim().min(2).max(200),
   description: z.string().trim().max(5000).default(''),
   category: z.string().trim().min(2).max(80),
-  rewardPoints: z.coerce.bigint().positive(),
-  imageUrl: z.string().url().max(2000).optional(),
+  rewardPoints: z.coerce.bigint().positive().max(env.MAX_SINGLE_REWARD_POINTS),
+  imageUrl: httpUrl(2000).optional(),
   proofType: z.enum(['url','text','file','none']).default('url'),
   instructions: z.array(z.unknown()).default([]),
   maxCompletions: z.number().int().positive().optional(),
@@ -131,7 +140,7 @@ router.get('/tasks', async (_req, res) => {
   res.json(r.rows);
 });
 
-router.post('/tasks', async (req: AuthedRequest, res) => {
+router.post('/tasks', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = taskSchema.parse(req.body);
   const task = await tx(async client => {
     const r = await client.query(
@@ -156,9 +165,9 @@ const offerSchema = z.object({
   title: z.string().trim().min(2).max(200),
   description: z.string().trim().max(5000).default(''),
   category: z.string().trim().min(2).max(80),
-  rewardPoints: z.coerce.bigint().min(0n),
-  imageUrl: z.string().url().max(2000).optional().nullable(),
-  landingUrl: z.string().url().max(4000).optional().nullable(),
+  rewardPoints: z.coerce.bigint().min(0n).max(env.MAX_SINGLE_REWARD_POINTS),
+  imageUrl: httpUrl(2000).optional().nullable(),
+  landingUrl: httpUrl(4000).optional().nullable(),
   difficulty: z.string().trim().max(50).optional().nullable(),
   estimatedMinutes: z.coerce.number().int().positive().optional().nullable(),
   allowedCountries: z.array(z.string().trim().min(2).max(3)).default([]),
@@ -181,7 +190,7 @@ router.get('/offers', async (_req, res) => {
   res.json(r.rows);
 });
 
-router.post('/offers', async (req: AuthedRequest, res) => {
+router.post('/offers', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = offerSchema.parse(req.body);
   const created = await tx(async client => {
     const r = await client.query(
@@ -215,7 +224,7 @@ router.post('/offers', async (req: AuthedRequest, res) => {
   res.status(201).json(created);
 });
 
-router.patch('/offers/:id', async (req: AuthedRequest, res) => {
+router.patch('/offers/:id', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = offerPatchSchema.parse(req.body);
   const offerId = String(req.params.id);
   const updated = await tx(async client => {
@@ -261,7 +270,7 @@ router.patch('/offers/:id', async (req: AuthedRequest, res) => {
   res.json(updated);
 });
 
-router.patch('/tasks/:id', async (req: AuthedRequest, res) => {
+router.patch('/tasks/:id', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = taskSchema.partial().parse(req.body);
   const taskId = String(req.params.id);
   const updated = await tx(async client => {
@@ -402,7 +411,7 @@ const withdrawalReview = z.object({
   reason: z.string().trim().max(1000).optional()
 });
 
-router.patch('/withdrawals/:id', async (req: AuthedRequest, res) => {
+router.patch('/withdrawals/:id', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = withdrawalReview.parse(req.body);
   const result = await tx(async client => {
     const wr = await client.query('SELECT * FROM withdrawals WHERE id=$1 FOR UPDATE', [String(req.params.id)]);
@@ -410,7 +419,29 @@ router.patch('/withdrawals/:id', async (req: AuthedRequest, res) => {
     if (!row) throw new HttpError(404, 'Withdrawal not found');
     if (['paid','rejected','failed','cancelled'].includes(row.status)) throw new HttpError(409, 'Withdrawal already finalized');
 
+    const allowedTransitions: Record<string,string[]> = {
+      pending: ['in_review','rejected','failed'],
+      in_review: ['processing','rejected','failed'],
+      processing: ['paid','rejected','failed']
+    };
+    if (!allowedTransitions[row.status]?.includes(input.status)) {
+      throw new HttpError(409, `Invalid withdrawal transition: ${row.status} -> ${input.status}`);
+    }
+    if ((input.status === 'rejected' || input.status === 'failed') && !input.reason) {
+      throw new HttpError(400, 'Reason is required when rejecting or failing a withdrawal');
+    }
+    if (input.status === 'paid' && !input.providerReference) {
+      throw new HttpError(400, 'Payment reference is required before marking a withdrawal paid');
+    }
+
     if (input.status === 'paid') {
+      const walletState = await client.query(
+        'SELECT debt_points FROM wallet_accounts WHERE user_id=$1 FOR UPDATE',
+        [row.user_id]
+      );
+      if (BigInt(walletState.rows[0]?.debt_points || 0) > 0n) {
+        throw new HttpError(409, 'Cannot pay a withdrawal while the account has reward debt');
+      }
       await Wallet.release(client, {
         userId: BigInt(row.user_id),
         points: BigInt(row.points),
@@ -461,8 +492,8 @@ const providerSchema = z.object({
   slug: z.string().trim().regex(/^[a-z0-9-]+$/),
   name: z.string().trim().min(2).max(100),
   kind: z.enum(['offerwall','survey','payout']),
-  wallUrl: z.string().url().optional(),
-  apiBaseUrl: z.string().url().optional(),
+  wallUrl: httpUrl().optional(),
+  apiBaseUrl: httpUrl().optional(),
   publicConfig: z.record(z.unknown()).default({}),
   secretConfig: z.record(z.unknown()).default({}),
   signatureMode: z.string().trim().max(50).default('hmac_sha256'),
@@ -477,7 +508,7 @@ router.get('/providers', async (_req, res) => {
   res.json(r.rows);
 });
 
-router.post('/providers', async (req: AuthedRequest, res) => {
+router.post('/providers', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = providerSchema.parse(req.body);
   const provider = await tx(async client => {
     const r = await client.query(
@@ -495,7 +526,7 @@ router.post('/providers', async (req: AuthedRequest, res) => {
   res.status(201).json(provider);
 });
 
-router.patch('/providers/:id', async (req: AuthedRequest, res) => {
+router.patch('/providers/:id', requireRole('admin'), async (req: AuthedRequest, res) => {
   const input = providerSchema.partial().parse(req.body);
   const providerId = String(req.params.id);
   const updated = await tx(async client => {
@@ -560,7 +591,7 @@ router.get('/payout-methods',async(_req,res)=>{
   res.json(r.rows);
 });
 
-router.post('/payout-methods',async(req:AuthedRequest,res)=>{
+router.post('/payout-methods',requireRole('admin'),async(req:AuthedRequest,res)=>{
   const input=payoutCatalogSchema.parse(req.body);
   const created=await tx(async client=>{
     const r=await client.query(
@@ -579,7 +610,7 @@ router.post('/payout-methods',async(req:AuthedRequest,res)=>{
   res.status(201).json(created);
 });
 
-router.patch('/payout-methods/:id',async(req:AuthedRequest,res)=>{
+router.patch('/payout-methods/:id',requireRole('admin'),async(req:AuthedRequest,res)=>{
   const input=payoutCatalogSchema.partial().parse(req.body);
   const id=String(req.params.id);
   const updated=await tx(async client=>{
@@ -613,9 +644,9 @@ router.patch('/payout-methods/:id',async(req:AuthedRequest,res)=>{
 
 const watchCampaignSchema = z.object({
   title:z.string().trim().min(2).max(200),
-  mediaUrl:z.string().url().max(4000),
+  mediaUrl:httpUrl(4000),
   durationSeconds:z.coerce.number().int().min(5).max(86400),
-  rewardPoints:z.coerce.bigint().positive(),
+  rewardPoints:z.coerce.bigint().positive().max(env.MAX_SINGLE_REWARD_POINTS),
   dailyLimit:z.coerce.number().int().positive().max(1000).default(1),
   isActive:z.boolean().default(true)
 });
@@ -627,7 +658,7 @@ router.get('/watch-campaigns',async(_req,res)=>{
   res.json(r.rows);
 });
 
-router.post('/watch-campaigns',async(req:AuthedRequest,res)=>{
+router.post('/watch-campaigns',requireRole('admin'),async(req:AuthedRequest,res)=>{
   const input=watchCampaignSchema.parse(req.body);
   const created=await tx(async client=>{
     const r=await client.query(
@@ -642,7 +673,7 @@ router.post('/watch-campaigns',async(req:AuthedRequest,res)=>{
   res.status(201).json(created);
 });
 
-router.patch('/watch-campaigns/:id',async(req:AuthedRequest,res)=>{
+router.patch('/watch-campaigns/:id',requireRole('admin'),async(req:AuthedRequest,res)=>{
   const input=watchCampaignSchema.partial().parse(req.body);
   const id=String(req.params.id);
   const updated=await tx(async client=>{

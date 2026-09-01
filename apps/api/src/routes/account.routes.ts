@@ -70,7 +70,7 @@ router.get('/level-progress', requireAuth, async (req: AuthedRequest, res) => {
 
 const profileSchema = z.object({
   fullName: z.string().trim().max(100).optional(),
-  avatarUrl: z.string().url().max(1000).optional().nullable(),
+  avatarUrl: z.string().url().max(1000).refine(value => ['http:','https:'].includes(new URL(value).protocol), 'Avatar URL must use http or https').optional().nullable(),
   countryCode: z.string().trim().max(3).optional(),
   bio: z.string().trim().max(500).optional()
 });
@@ -93,7 +93,7 @@ router.patch('/profile', requireAuth, async (req: AuthedRequest, res) => {
 
 router.get('/transactions', requireAuth, async (req: AuthedRequest, res) => {
   const r = await pool.query(
-    `SELECT id,direction,points,available_delta,held_delta,available_after,held_after,source_type,source_id,metadata,created_at
+    `SELECT id,direction,points,available_delta,held_delta,debt_delta,available_after,held_after,debt_after,source_type,source_id,metadata,created_at
      FROM wallet_entries
      WHERE user_id=$1
      ORDER BY created_at DESC

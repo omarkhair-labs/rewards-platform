@@ -55,6 +55,7 @@ async function applyReferralCommission(client: pg.PoolClient, rewardEvent: any, 
 export const Rewards = {
   async credit(client: pg.PoolClient, input: CreditInput) {
     if (input.rewardPoints <= 0n) throw new HttpError(400, 'Reward must be positive');
+    if (input.rewardPoints > env.MAX_SINGLE_REWARD_POINTS) throw new HttpError(400, 'Reward exceeds platform maximum');
 
     const prior = await client.query(
       'SELECT * FROM reward_events WHERE idempotency_key=$1',
@@ -124,7 +125,7 @@ export const Rewards = {
 
     const points = BigInt(event.reward_points);
 
-    await Wallet.debit(client, {
+    const userReclaim = await Wallet.reclaim(client, {
       userId: BigInt(event.user_id),
       points,
       sourceType: 'reversal',
@@ -132,6 +133,22 @@ export const Rewards = {
       idempotencyKey: `wallet:reward-reversal:${event.id}`,
       metadata: { reason }
     });
+
+    if (BigInt(userReclaim.debt_after || 0) > 0n) {
+      await client.query(
+        `UPDATE users
+         SET withdrawal_locked_at=COALESCE(withdrawal_locked_at,NOW()),
+             withdrawal_lock_reason='Outstanding reward debt',
+             updated_at=NOW()
+         WHERE id=$1`,
+        [event.user_id]
+      );
+      await client.query(
+        `INSERT INTO fraud_events(user_id,event_type,severity,metadata)
+         VALUES ($1,'reward_reversal_debt','high',$2)`,
+        [event.user_id, JSON.stringify({ rewardEventId: event.id, debtPoints: userReclaim.debt_after, reason })]
+      );
+    }
 
     const commissions = await client.query(
       `SELECT * FROM referral_commissions
@@ -141,7 +158,7 @@ export const Rewards = {
     );
 
     for (const commission of commissions.rows) {
-      await Wallet.debit(client, {
+      const referralReclaim = await Wallet.reclaim(client, {
         userId: BigInt(commission.referrer_user_id),
         points: BigInt(commission.commission_points),
         sourceType: 'referral_reversal',
@@ -149,6 +166,21 @@ export const Rewards = {
         idempotencyKey: `wallet:referral-reversal:${commission.id}`,
         metadata: { rewardEventId: event.id, reason }
       });
+      if (BigInt(referralReclaim.debt_after || 0) > 0n) {
+        await client.query(
+          `UPDATE users
+           SET withdrawal_locked_at=COALESCE(withdrawal_locked_at,NOW()),
+               withdrawal_lock_reason='Outstanding reward debt',
+               updated_at=NOW()
+           WHERE id=$1`,
+          [commission.referrer_user_id]
+        );
+        await client.query(
+          `INSERT INTO fraud_events(user_id,event_type,severity,metadata)
+           VALUES ($1,'referral_reversal_debt','high',$2)`,
+          [commission.referrer_user_id, JSON.stringify({ commissionId: commission.id, rewardEventId: event.id, debtPoints: referralReclaim.debt_after, reason })]
+        );
+      }
       await client.query(
         `UPDATE referral_commissions
          SET status='reversed',reversed_at=NOW()
@@ -176,10 +208,10 @@ export const Rewards = {
     return updated.rows[0];
   },
 
-  verifyGenericSignature(secret: string, txId: string, userId: string, reward: string, signature: string) {
+  verifyGenericSignature(secret: string, txId: string, userId: string, reward: string, status: string, signature: string) {
     const expected = crypto
       .createHmac('sha256', secret)
-      .update(`${txId}:${userId}:${reward}`)
+      .update(`${txId}:${userId}:${reward}:${status}`)
       .digest('hex');
 
     const left = Buffer.from(expected);

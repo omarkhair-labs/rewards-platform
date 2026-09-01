@@ -28,6 +28,16 @@ async function lockWallet(client: pg.PoolClient, userId: bigint) {
 }
 
 
+async function clearDebtLockIfSettled(client: pg.PoolClient, userId: bigint, debt: bigint) {
+  if (debt !== 0n) return;
+  await client.query(
+    `UPDATE users
+     SET withdrawal_locked_at=NULL,withdrawal_lock_reason=NULL,updated_at=NOW()
+     WHERE id=$1 AND withdrawal_lock_reason='Outstanding reward debt'`,
+    [userId.toString()]
+  );
+}
+
 async function recalculateLevel(client: pg.PoolClient, userId: bigint) {
   const current = await client.query(
     `SELECT u.level,u.rank,w.lifetime_earned_points
@@ -70,18 +80,22 @@ async function writeEntry(
   direction: string,
   availableDelta: bigint,
   heldDelta: bigint,
+  debtDelta: bigint,
   availableAfter: bigint,
-  heldAfter: bigint
+  heldAfter: bigint,
+  debtAfter: bigint
 ) {
   const r = await client.query(
     `INSERT INTO wallet_entries
-      (user_id,direction,points,available_delta,held_delta,available_after,held_after,source_type,source_id,idempotency_key,metadata)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      (user_id,direction,points,available_delta,held_delta,debt_delta,available_after,held_after,debt_after,source_type,source_id,idempotency_key,metadata)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      RETURNING *`,
     [
-      input.userId.toString(), direction, input.points.toString(), availableDelta.toString(), heldDelta.toString(),
-      availableAfter.toString(), heldAfter.toString(), input.sourceType, input.sourceId || null,
-      input.idempotencyKey, JSON.stringify(input.metadata || {})
+      input.userId.toString(), direction, input.points.toString(),
+      availableDelta.toString(), heldDelta.toString(), debtDelta.toString(),
+      availableAfter.toString(), heldAfter.toString(), debtAfter.toString(),
+      input.sourceType, input.sourceId || null, input.idempotencyKey,
+      JSON.stringify(input.metadata || {})
     ]
   );
   return r.rows[0];
@@ -92,67 +106,141 @@ export const Wallet = {
     if (input.points <= 0n) throw new HttpError(400, 'Points must be positive');
     const prior = await existing(client, input.idempotencyKey);
     if (prior) return prior;
+
     const wallet = await lockWallet(client, input.userId);
-    const available = BigInt(wallet.available_points) + input.points;
-    const held = BigInt(wallet.held_points);
+    const currentAvailable = BigInt(wallet.available_points);
+    const currentHeld = BigInt(wallet.held_points);
+    const currentDebt = BigInt(wallet.debt_points || 0);
+
+    const debtPaid = currentDebt < input.points ? currentDebt : input.points;
+    const availableCredit = input.points - debtPaid;
+    const available = currentAvailable + availableCredit;
+    const debt = currentDebt - debtPaid;
+
     await client.query(
       `UPDATE wallet_accounts
-       SET available_points=$1,lifetime_earned_points=lifetime_earned_points+$2,version=version+1,updated_at=NOW()
-       WHERE user_id=$3`,
-      [available.toString(), input.points.toString(), input.userId.toString()]
+       SET available_points=$1,debt_points=$2,lifetime_earned_points=lifetime_earned_points+$3,
+           version=version+1,updated_at=NOW()
+       WHERE user_id=$4`,
+      [available.toString(), debt.toString(), input.points.toString(), input.userId.toString()]
     );
+
+    await clearDebtLockIfSettled(client,input.userId,debt);
     await recalculateLevel(client,input.userId);
-    return writeEntry(client, input, 'credit', input.points, 0n, available, held);
+
+    return writeEntry(
+      client,input,'credit',availableCredit,0n,-debtPaid,
+      available,currentHeld,debt
+    );
   },
 
   async debit(client: pg.PoolClient, input: Mutation) {
     if (input.points <= 0n) throw new HttpError(400, 'Points must be positive');
     const prior = await existing(client, input.idempotencyKey);
     if (prior) return prior;
+
     const wallet = await lockWallet(client, input.userId);
     const current = BigInt(wallet.available_points);
-    if (current < input.points) throw new HttpError(409, 'Insufficient balance');
-    const available = current - input.points;
     const held = BigInt(wallet.held_points);
+    const debt = BigInt(wallet.debt_points || 0);
+    if (current < input.points) throw new HttpError(409, 'Insufficient balance');
+
+    const available = current - input.points;
     await client.query(
       `UPDATE wallet_accounts SET available_points=$1,version=version+1,updated_at=NOW() WHERE user_id=$2`,
       [available.toString(), input.userId.toString()]
     );
-    return writeEntry(client, input, 'debit', -input.points, 0n, available, held);
+
+    return writeEntry(client,input,'debit',-input.points,0n,0n,available,held,debt);
+  },
+
+  async reclaim(client: pg.PoolClient, input: Mutation) {
+    if (input.points <= 0n) throw new HttpError(400, 'Points must be positive');
+    const prior = await existing(client, input.idempotencyKey);
+    if (prior) return prior;
+
+    const wallet = await lockWallet(client, input.userId);
+    const current = BigInt(wallet.available_points);
+    const held = BigInt(wallet.held_points);
+    const currentDebt = BigInt(wallet.debt_points || 0);
+
+    const availableDebit = current < input.points ? current : input.points;
+    const shortfall = input.points - availableDebit;
+    const available = current - availableDebit;
+    const debt = currentDebt + shortfall;
+
+    await client.query(
+      `UPDATE wallet_accounts
+       SET available_points=$1,debt_points=$2,version=version+1,updated_at=NOW()
+       WHERE user_id=$3`,
+      [available.toString(),debt.toString(),input.userId.toString()]
+    );
+
+    return writeEntry(
+      client,input,'debit',-availableDebit,0n,shortfall,
+      available,held,debt
+    );
   },
 
   async hold(client: pg.PoolClient, input: Mutation) {
     if (input.points <= 0n) throw new HttpError(400, 'Points must be positive');
     const prior = await existing(client, input.idempotencyKey);
     if (prior) return prior;
+
     const wallet = await lockWallet(client, input.userId);
     const current = BigInt(wallet.available_points);
+    const currentDebt = BigInt(wallet.debt_points || 0);
+    if (currentDebt > 0n) throw new HttpError(409, 'Account has outstanding reward debt');
     if (current < input.points) throw new HttpError(409, 'Insufficient balance');
+
     const available = current - input.points;
     const held = BigInt(wallet.held_points) + input.points;
+
     await client.query(
       `UPDATE wallet_accounts SET available_points=$1,held_points=$2,version=version+1,updated_at=NOW() WHERE user_id=$3`,
       [available.toString(), held.toString(), input.userId.toString()]
     );
-    return writeEntry(client, input, 'hold', -input.points, input.points, available, held);
+
+    return writeEntry(client,input,'hold',-input.points,input.points,0n,available,held,currentDebt);
   },
 
   async release(client: pg.PoolClient, input: Mutation, settle: boolean) {
     if (input.points <= 0n) throw new HttpError(400, 'Points must be positive');
     const prior = await existing(client, input.idempotencyKey);
     if (prior) return prior;
+
     const wallet = await lockWallet(client, input.userId);
     const currentHeld = BigInt(wallet.held_points);
     if (currentHeld < input.points) throw new HttpError(409, 'Insufficient held balance');
+
+    const currentAvailable = BigInt(wallet.available_points);
+    const currentDebt = BigInt(wallet.debt_points || 0);
     const held = currentHeld - input.points;
-    const available = BigInt(wallet.available_points) + (settle ? 0n : input.points);
+
+    if (settle) {
+      await client.query(
+        `UPDATE wallet_accounts SET held_points=$1,version=version+1,updated_at=NOW() WHERE user_id=$2`,
+        [held.toString(),input.userId.toString()]
+      );
+      return writeEntry(client,input,'debit',0n,-input.points,0n,currentAvailable,held,currentDebt);
+    }
+
+    const debtPaid = currentDebt < input.points ? currentDebt : input.points;
+    const releasedAvailable = input.points - debtPaid;
+    const available = currentAvailable + releasedAvailable;
+    const debt = currentDebt - debtPaid;
+
     await client.query(
-      `UPDATE wallet_accounts SET available_points=$1,held_points=$2,version=version+1,updated_at=NOW() WHERE user_id=$3`,
-      [available.toString(), held.toString(), input.userId.toString()]
+      `UPDATE wallet_accounts
+       SET available_points=$1,held_points=$2,debt_points=$3,version=version+1,updated_at=NOW()
+       WHERE user_id=$4`,
+      [available.toString(),held.toString(),debt.toString(),input.userId.toString()]
     );
+    await clearDebtLockIfSettled(client,input.userId,debt);
+
     return writeEntry(
-      client, input, settle ? 'debit' : 'release',
-      settle ? 0n : input.points, -input.points, available, held
+      client,input,'release',releasedAvailable,-input.points,-debtPaid,
+      available,held,debt
     );
   }
 };

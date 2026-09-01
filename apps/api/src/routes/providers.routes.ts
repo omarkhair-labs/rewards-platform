@@ -1,12 +1,22 @@
 import crypto from 'crypto';
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { pool, tx } from '../db.js';
 import { requireAuth, type AuthedRequest } from '../auth.js';
 import { HttpError } from '../http.js';
 import { Rewards } from '../rewards.js';
+import { assertHttpUrl } from '../security.js';
 
 const router = Router();
+
+const genericPostbackLimiter=rateLimit({
+  windowMs:60*1000,
+  limit:600,
+  standardHeaders:'draft-7',
+  legacyHeaders:false,
+  message:{error:'Postback rate limit exceeded'}
+});
 
 router.get('/', requireAuth, async (_req, res) => {
   const r = await pool.query(
@@ -85,6 +95,7 @@ router.post('/offers/:id/click', requireAuth, async (req: AuthedRequest, res) =>
   }
 
   if (!target) throw new HttpError(409, 'Offer provider URL is not configured');
+  target = assertHttpUrl(target, 'Offer URL');
   res.json({ url: target, clickToken });
 });
 
@@ -96,7 +107,7 @@ const callbackSchema = z.object({
   signature: z.string().min(16)
 });
 
-router.post('/:slug/postback', async (req, res) => {
+router.post('/:slug/postback', genericPostbackLimiter, async (req, res) => {
   const raw = {
     transactionId: req.body?.transactionId ?? req.query.transactionId ?? req.query.tx ?? req.query.transaction_id,
     userId: req.body?.userId ?? req.query.userId ?? req.query.uid ?? req.query.user_id ?? req.query.subid,
@@ -106,9 +117,13 @@ router.post('/:slug/postback', async (req, res) => {
   };
   const input = callbackSchema.parse(raw);
 
+  const slugParam = req.params.slug;
+  const slug = Array.isArray(slugParam) ? slugParam[0] : slugParam;
+  if (!slug) throw new HttpError(400, 'Provider slug is required');
+
   const providerResult = await pool.query(
     `SELECT * FROM providers WHERE slug=$1 AND is_enabled=TRUE`,
-    [req.params.slug.toLowerCase()]
+    [slug.toLowerCase()]
   );
   const provider = providerResult.rows[0];
   if (!provider) throw new HttpError(404, 'Provider not found');
@@ -122,6 +137,7 @@ router.post('/:slug/postback', async (req, res) => {
     input.transactionId,
     input.userId.toString(),
     input.rewardPoints.toString(),
+    input.status,
     input.signature
   )) {
     throw new HttpError(403, 'Invalid provider signature');

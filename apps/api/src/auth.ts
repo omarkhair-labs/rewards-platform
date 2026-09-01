@@ -16,14 +16,23 @@ export async function verifyPassword(hash: string, password: string) {
 }
 
 export function issueToken(userId: bigint, role: string) {
-  return jwt.sign({ sub: userId.toString(), role }, env.JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ sub: userId.toString(), role }, env.JWT_SECRET, {
+    algorithm: 'HS256',
+    expiresIn: '7d',
+    issuer: env.JWT_ISSUER,
+    audience: env.JWT_AUDIENCE
+  });
 }
 
 export async function requireAuth(req: AuthedRequest, _res: Response, next: NextFunction) {
   try {
     const raw = req.headers.authorization;
     if (!raw?.startsWith('Bearer ')) throw new HttpError(401, 'Unauthorized');
-    const payload = jwt.verify(raw.slice(7), env.JWT_SECRET) as jwt.JwtPayload;
+    const payload = jwt.verify(raw.slice(7), env.JWT_SECRET, {
+      algorithms: ['HS256'],
+      issuer: env.JWT_ISSUER,
+      audience: env.JWT_AUDIENCE
+    }) as jwt.JwtPayload;
     const userId = BigInt(String(payload.sub));
     const result = await pool.query(
       `SELECT id, role, status FROM users WHERE id=$1`,

@@ -94,12 +94,17 @@ router.post('/', requireAuth, async (req: AuthedRequest, res) => {
     if (prior.rows[0]) return prior.rows[0];
 
     const user = await client.query(
-      'SELECT id,withdrawal_locked_at,status FROM users WHERE id=$1 FOR UPDATE',
+      `SELECT u.id,u.withdrawal_locked_at,u.status,w.debt_points
+       FROM users u
+       JOIN wallet_accounts w ON w.user_id=u.id
+       WHERE u.id=$1
+       FOR UPDATE OF u,w`,
       [req.auth!.userId.toString()]
     );
     if (!user.rows[0]) throw new HttpError(404, 'User not found');
     if (user.rows[0].status !== 'active') throw new HttpError(403, 'Account unavailable');
     if (user.rows[0].withdrawal_locked_at) throw new HttpError(403, 'Withdrawals are locked');
+    if (BigInt(user.rows[0].debt_points || 0) > 0n) throw new HttpError(403, 'Outstanding reward debt must be settled before cashout');
 
     const pending = await client.query(
       `SELECT id FROM withdrawals

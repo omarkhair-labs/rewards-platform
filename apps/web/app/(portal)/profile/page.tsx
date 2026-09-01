@@ -14,6 +14,8 @@ type WalletEntry={
   source_type:string;
   created_at:string;
   available_after:string|number;
+  debt_after?:string|number;
+  debt_delta?:string|number;
 };
 
 export default function ProfilePage(){
@@ -129,8 +131,8 @@ export default function ProfilePage(){
     <div className="panel mt">
       <div className="filters"><button className={'filter '+(tab==='earnings'?'active':'')} onClick={()=>setTab('earnings')}>Earnings</button><button className={'filter '+(tab==='withdrawals'?'active':'')} onClick={()=>setTab('withdrawals')}>Withdrawals</button></div>
       {tab==='earnings'?<table className="table">
-        <thead><tr><th>Source</th><th>Direction</th><th>Points</th><th>Balance after</th><th>Date</th></tr></thead>
-        <tbody>{transactions.length?transactions.map(row=><tr key={row.id}><td>{row.source_type}</td><td>{row.direction}</td><td>{formatPoints(row.points)}</td><td>{formatPoints(row.available_after)}</td><td>{new Date(row.created_at).toLocaleDateString()}</td></tr>):<tr><td colSpan={5} className="center muted" style={{padding:24}}>No wallet activity yet.</td></tr>}</tbody>
+        <thead><tr><th>Source</th><th>Direction</th><th>Points</th><th>Balance after</th><th>Debt after</th><th>Date</th></tr></thead>
+        <tbody>{transactions.length?transactions.map(row=><tr key={row.id}><td>{row.source_type}</td><td>{row.direction}</td><td>{formatPoints(row.points)}</td><td>{formatPoints(row.available_after)}</td><td>{formatPoints(row.debt_after||0)}</td><td>{new Date(row.created_at).toLocaleDateString()}</td></tr>):<tr><td colSpan={6} className="center muted" style={{padding:24}}>No wallet activity yet.</td></tr>}</tbody>
       </table>:<table className="table">
         <thead><tr><th>Method</th><th>Points</th><th>Status</th><th>Date</th></tr></thead>
         <tbody>{withdrawals.length?withdrawals.map(row=><tr key={row.id}><td>{row.method_key}</td><td>{formatPoints(row.points)}</td><td>{row.status}</td><td>{new Date(row.requested_at).toLocaleDateString()}</td></tr>):<tr><td colSpan={4} className="center muted" style={{padding:24}}>No withdrawals yet.</td></tr>}</tbody>
