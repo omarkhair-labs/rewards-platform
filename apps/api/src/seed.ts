@@ -239,15 +239,28 @@ async function run() {
       idempotencyKey: 'demo:withdrawal:hold:001',
       metadata: { seeded: true }
     });
+    const catalogMethod = await client.query(
+      `SELECT id,fee_bps FROM payout_method_catalog
+       WHERE method_key='instapay' AND is_enabled=TRUE
+       LIMIT 1`
+    );
+    const feeBps = Number(catalogMethod.rows[0]?.fee_bps || 0);
+    const feePoints = (5000n * BigInt(feeBps)) / 10000n;
+    const netPoints = 5000n - feePoints;
+
     await client.query(
       `INSERT INTO withdrawals
-       (user_id,method_id,method_key,account_snapshot,points,status,idempotency_key)
-       VALUES ($1,$2,'instapay',$3,5000,'in_review','demo:withdrawal:request:001')
+       (user_id,method_id,method_key,account_snapshot,points,payout_method_catalog_id,fee_bps,fee_points,net_points,status,idempotency_key)
+       VALUES ($1,$2,'instapay',$3,5000,$4,$5,$6,$7,'in_review','demo:withdrawal:request:001')
        ON CONFLICT (idempotency_key) DO NOTHING`,
       [
         ownerId.toString(),
         method.rows[0].id,
-        JSON.stringify({ account: 'demo@instapay' })
+        JSON.stringify({ account: 'demo@instapay' }),
+        catalogMethod.rows[0]?.id || null,
+        feeBps,
+        feePoints.toString(),
+        netPoints.toString()
       ]
     );
 
