@@ -19,7 +19,7 @@ import {
   X
 } from 'lucide-react';
 import { apiFetch, clearToken, formatPoints, getToken } from '@/lib/api';
-import type { Me } from '@/lib/types';
+import type { Me, Notification } from '@/lib/types';
 
 const nav = [
   { href:'/dashboard', label:'Dashboard', icon:LayoutDashboard },
@@ -45,6 +45,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [me,setMe] = useState<Me|null>(null);
   const [loading,setLoading] = useState(true);
   const [sidebarOpen,setSidebarOpen] = useState(false);
+  const [notificationsOpen,setNotificationsOpen] = useState(false);
+  const [accountOpen,setAccountOpen] = useState(false);
+  const [notifications,setNotifications] = useState<Notification[]>([]);
 
   useEffect(()=>{
     let active = true;
@@ -55,8 +58,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const user = await apiFetch<Me>('/api/auth/me');
-        if (active) setMe(user);
+        const [user,items] = await Promise.all([
+          apiFetch<Me>('/api/auth/me'),
+          apiFetch<Notification[]>('/api/account/notifications').catch(()=>[])
+        ]);
+        if (active) { setMe(user); setNotifications(items); }
       } catch {
         clearToken();
         router.replace('/login');
@@ -69,11 +75,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return ()=>{ active=false; };
   },[router]);
 
-  useEffect(()=>setSidebarOpen(false),[pathname]);
+  useEffect(()=>{setSidebarOpen(false);setNotificationsOpen(false);setAccountOpen(false);},[pathname]);
 
   function logout(){
     clearToken();
     router.replace('/login');
+  }
+
+  async function markRead(item:Notification){
+    if(item.read_at)return;
+    await apiFetch(`/api/account/notifications/${item.id}/read`,{method:'PATCH'});
+    setNotifications(current=>current.map(row=>row.id===item.id?{...row,read_at:new Date().toISOString()}:row));
   }
 
   const username = me?.username || 'Member';
@@ -83,6 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isPremium = Boolean(me?.is_premium);
   const balance = formatPoints(me?.available_points || 0);
   const activeLabel = nav.find(n=>n.href===pathname)?.label || 'Rewards';
+  const unread = notifications.filter(item=>!item.read_at).length;
 
   if (loading || !me) {
     return <div className="app-boot">
@@ -106,10 +119,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <div className="top-actions">
           <Link className="wallet-chip" href="/cashout" aria-label={`${balance} coins available`}><span>🪙</span><b>{balance}</b></Link>
-          <button className="chrome-button" aria-label="Notifications"><Bell size={20}/></button>
-          <Link className="chrome-button" aria-label="Profile" href="/profile"><UserRound size={21}/></Link>
+          <button className="chrome-button notification-trigger" aria-label={`Notifications${unread?` (${unread} unread)`:''}`} aria-expanded={notificationsOpen} onClick={()=>{setNotificationsOpen(v=>!v);setAccountOpen(false);}}><Bell size={20}/>{unread>0&&<span className="notification-count">{unread}</span>}</button>
+          <button className="chrome-button" aria-label="Account menu" aria-expanded={accountOpen} onClick={()=>{setAccountOpen(v=>!v);setNotificationsOpen(false);}}><UserRound size={21}/></button>
         </div>
       </header>
+
+      {(notificationsOpen||accountOpen)&&<button className="popover-scrim" aria-label="Close open menu" onClick={()=>{setNotificationsOpen(false);setAccountOpen(false);}} />}
+
+      {notificationsOpen&&<section className="top-popover notification-popover" aria-label="Notifications">
+        <div className="popover-head"><div><b>Notifications</b><span>{unread} unread</span></div>{unread>0&&<button onClick={()=>void Promise.all(notifications.filter(n=>!n.read_at).map(markRead))}>Mark all read</button>}</div>
+        <div className="notification-list">{notifications.length?notifications.map(item=><button key={item.id} className={'notification-item '+(!item.read_at?'unread':'')} onClick={()=>void markRead(item)}><span className="notification-dot"/><span><b>{item.title}</b><small>{item.message}</small><time>{new Date(item.created_at).toLocaleDateString()}</time></span></button>):<div className="popover-empty">You are all caught up.</div>}</div>
+      </section>}
+
+      {accountOpen&&<section className="top-popover account-popover" aria-label="Account menu">
+        <div className="account-summary"><span className="avatar">{initial}</span><span><b>{username}</b><small>{me.email}</small></span></div>
+        <Link href="/profile"><UserRound size={16}/> View profile</Link>
+        <Link href="/profile"><Settings size={16}/> Account settings</Link>
+        <button onClick={logout}><LogOut size={16}/> Logout</button>
+      </section>}
 
       <aside className={'sidebar '+(sidebarOpen?'open':'')}>
         <div className="member-card">

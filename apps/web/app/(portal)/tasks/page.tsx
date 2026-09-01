@@ -3,14 +3,15 @@
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Clock3, Eye, FileCheck2, ListTodo, RefreshCw, Search } from 'lucide-react';
-import { apiFetch, formatPoints } from '@/lib/api';
-import type { Task } from '@/lib/types';
+import { apiFetch, DEMO_MODE, formatPoints } from '@/lib/api';
+import type { Task, TaskSubmission } from '@/lib/types';
 import { ErrorPanel, LoadingPanel } from '@/components/LoadingPanel';
 
 type StatusTab='all'|'available'|'review'|'completed';
 
 export default function TasksPage(){
   const [tasks,setTasks]=useState<Task[]>([]);
+  const [submissions,setSubmissions]=useState<TaskSubmission[]>([]);
   const [selected,setSelected]=useState<Task|null>(null);
   const [proofUrl,setProofUrl]=useState('');
   const [proofText,setProofText]=useState('');
@@ -20,30 +21,39 @@ export default function TasksPage(){
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(true);
   const [submitting,setSubmitting]=useState(false);
+  const [success,setSuccess]=useState('');
 
   const load=useCallback(async()=>{
     setError('');
-    try{setTasks(await apiFetch<Task[]>('/api/tasks'));}
+    try{
+      const [availableTasks,history]=await Promise.all([
+        apiFetch<Task[]>('/api/tasks'),
+        apiFetch<TaskSubmission[]>('/api/tasks/submissions/me')
+      ]);
+      setTasks(availableTasks);setSubmissions(history);
+    }
     catch(err){setError(err instanceof Error?err.message:'Failed to load tasks');}
     finally{setLoading(false);}
   },[]);
 
   useEffect(()=>{void load();},[load]);
 
-  const categories=useMemo(()=>['All',...Array.from(new Set(tasks.map(t=>t.category))).sort()],[tasks]);
+  const categories=useMemo(()=>['All',...Array.from(new Set([...tasks.map(t=>t.category),...submissions.map(s=>s.category)])).sort()],[tasks,submissions]);
   const filtered=useMemo(()=>tasks.filter(t=>{
     if(tab==='completed')return false;
     const categoryMatch=category==='All'||t.category===category;
     const statusMatch=tab==='all'||(tab==='available'&&!t.already_submitted)||(tab==='review'&&t.already_submitted);
     return categoryMatch&&statusMatch;
   }),[tasks,category,tab]);
+  const completed=useMemo(()=>submissions.filter(s=>['approved','rejected'].includes(s.status)&&(category==='All'||s.category===category)),[submissions,category]);
   const inReview=tasks.filter(t=>t.already_submitted).length;
   const available=tasks.length-inReview;
+  const approved=submissions.filter(s=>s.status==='approved').length;
 
   async function submit(e:FormEvent){
     e.preventDefault();
     if(!selected)return;
-    setSubmitting(true);setError('');
+    setSubmitting(true);setError('');setSuccess('');
     try{
       const body:Record<string,string>={};
       if(proofUrl.trim())body.proofUrl=proofUrl.trim();
@@ -51,13 +61,16 @@ export default function TasksPage(){
       if(selected.proof_type==='file'){
         if(!proofFile)throw new Error('Choose a proof file first');
         const init=await apiFetch<{uploadUrl:string;publicUrl:string;headers:Record<string,string>}>('/api/uploads/proof',{method:'POST',body:JSON.stringify({filename:proofFile.name,contentType:proofFile.type,contentLength:proofFile.size})});
-        const upload=await fetch(init.uploadUrl,{method:'PUT',headers:init.headers,body:proofFile});
-        if(!upload.ok)throw new Error('Proof file upload failed');
+        if(!DEMO_MODE){
+          const upload=await fetch(init.uploadUrl,{method:'PUT',headers:init.headers,body:proofFile});
+          if(!upload.ok)throw new Error('Proof file upload failed');
+        }
         body.proofFileUrl=init.publicUrl;
       }
       await apiFetch(`/api/tasks/${selected.id}/submit`,{method:'POST',body:JSON.stringify(body)});
       setSelected(null);setProofUrl('');setProofText('');setProofFile(null);
       await load();
+      setSuccess('Proof submitted successfully. You can track it under In Review.');
     }catch(err){setError(err instanceof Error?err.message:'Unable to submit proof');}
     finally{setSubmitting(false);}
   }
@@ -72,6 +85,7 @@ export default function TasksPage(){
       <div className="page-actions"><Link className="primary-button" href="/dashboard"><ArrowLeft size={15}/> Back to Dashboard</Link><span className="live-dot">Tasks updated</span></div>
     </section>
     {error&&<div className="notice" style={{borderColor:'rgba(255,90,126,.4)',color:'#ff9bb5'}}>{error}</div>}
+    {success&&<div className="notice">{success}</div>}
 
     <div className="task-tabs">
       <button className={'filter '+(tab==='all'?'active':'')} onClick={()=>setTab('all')}>All Tasks</button>
@@ -84,7 +98,7 @@ export default function TasksPage(){
       <div className="stat-card"><span className="summary-icon">📋</span><strong>{tasks.length}</strong><span>Total Tasks</span></div>
       <div className="stat-card"><span className="summary-icon">⏳</span><strong>{available}</strong><span>Available</span></div>
       <div className="stat-card"><span className="summary-icon">🔍</span><strong>{inReview}</strong><span>In Review</span></div>
-      <div className="stat-card"><span className="summary-icon">✅</span><strong>0</strong><span>Completed</span></div>
+      <div className="stat-card"><span className="summary-icon">✅</span><strong>{approved}</strong><span>Completed</span></div>
     </div>
 
     <div className="toolbar mt">
@@ -95,7 +109,14 @@ export default function TasksPage(){
     <div className="panel table-wrap">
       <table className="table">
         <thead><tr><th>Task</th><th>Description</th><th>Reward</th><th>Status</th><th>Progress</th><th>Actions</th></tr></thead>
-        <tbody>{filtered.length?filtered.map(t=><tr key={t.id}>
+        <tbody>{tab==='completed'?(completed.length?completed.map(s=><tr key={'submission-'+s.id}>
+          <td><b>{s.title}</b><br/><span className="muted">{s.category}</span></td>
+          <td style={{maxWidth:320}}>{s.review_note||'Submission review completed.'}</td>
+          <td><span className="reward">{formatPoints(s.reward_points)} Coins</span></td>
+          <td><span className={'status-pill '+(s.status==='approved'?'available':'review')}>{s.status.toUpperCase()}</span></td>
+          <td>{s.reviewed_at?new Date(s.reviewed_at).toLocaleDateString():'Reviewed'}</td>
+          <td><button className="secondary-button" onClick={()=>setTab('all')}>{s.status==='rejected'?'Try Again':'Completed'}</button></td>
+        </tr>):<tr><td colSpan={6}><div className="empty-state"><b>No completed tasks yet</b><span>Approved and rejected submissions will appear here.</span></div></td></tr>):filtered.length?filtered.map(t=><tr key={t.id}>
           <td><b>{t.title}</b><br/><span className="muted">{t.category}</span></td>
           <td style={{maxWidth:320}}>{t.description}</td>
           <td><span className="reward">{formatPoints(t.reward_points)} Coins</span></td>

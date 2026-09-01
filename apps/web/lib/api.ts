@@ -1,4 +1,5 @@
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/$/, '');
+export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
 export type ApiErrorPayload = {
   error?: string;
@@ -28,6 +29,10 @@ export async function apiFetch<T>(
   path: string,
   options: RequestInit & { auth?: boolean } = {}
 ): Promise<T> {
+  if (DEMO_MODE) {
+    const { demoApiFetch } = await import('./demo-api');
+    return demoApiFetch<T>(path, options);
+  }
   const headers = new Headers(options.headers || {});
   headers.set('Accept', 'application/json');
 

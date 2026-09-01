@@ -103,6 +103,33 @@
 }
 
 .wallet-chip b { font-size: 17px; }
+.notification-trigger { position: relative; }
+.notification-count { position: absolute; right: -4px; top: -5px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: grid; place-items: center; background: #ee3d69; color: #fff; border: 2px solid #1e1e2e; font-size: 9px; font-weight: 900; }
+.top-popover { position: fixed; right: 18px; top: 62px; z-index: 95; width: min(390px, calc(100vw - 24px)); overflow: hidden; border: 2px solid var(--member-border); border-radius: 16px; background: linear-gradient(150deg, #3b3855, #28263d); box-shadow: 0 24px 70px rgba(0, 0, 0, .58); }
+.popover-scrim { position: fixed; inset: 0; z-index: 90; border: 0; background: transparent; }
+.popover-head { min-height: 68px; padding: 15px 17px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid rgba(132, 100, 188, .45); }
+.popover-head b,.popover-head span { display: block; }
+.popover-head b { font-size: 17px; }
+.popover-head span { margin-top: 3px; color: #aaa8bc; font-size: 11px; }
+.popover-head button { border: 0; background: transparent; color: #39aef3; font-size: 11px; cursor: pointer; }
+.notification-list { max-height: 410px; overflow-y: auto; }
+.notification-item { width: 100%; padding: 14px 16px; display: grid; grid-template-columns: 8px 1fr; gap: 11px; text-align: left; color: #fff; background: transparent; border: 0; border-bottom: 1px solid rgba(132, 100, 188, .26); cursor: pointer; }
+.notification-item:hover,.notification-item.unread { background: rgba(26, 146, 226, .09); }
+.notification-dot { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: #5d5871; }
+.notification-item.unread .notification-dot { background: #17aaf5; box-shadow: 0 0 12px rgba(23, 170, 245, .7); }
+.notification-item b,.notification-item small,.notification-item time { display: block; }
+.notification-item b { font-size: 13px; }
+.notification-item small { margin-top: 4px; color: #b7b5c4; font-size: 11px; line-height: 1.45; }
+.notification-item time { margin-top: 7px; color: #7e7b91; font-size: 9px; }
+.popover-empty { padding: 34px 18px; text-align: center; color: #aaa8bc; font-size: 12px; }
+.account-popover { width: 270px; padding: 10px; }
+.account-summary { padding: 11px; display: flex; align-items: center; gap: 11px; border-bottom: 1px solid rgba(132, 100, 188, .4); margin-bottom: 7px; }
+.account-summary .avatar { width: 42px; height: 42px; }
+.account-summary b,.account-summary small { display: block; }
+.account-summary b { font-size: 13px; }
+.account-summary small { margin-top: 3px; color: #aaa8bc; font-size: 10px; }
+.account-popover > a,.account-popover > button { width: 100%; min-height: 42px; padding: 0 11px; display: flex; align-items: center; gap: 9px; border: 0; border-radius: 9px; color: #deddea; background: transparent; font-size: 12px; cursor: pointer; }
+.account-popover > a:hover,.account-popover > button:hover { background: rgba(26, 146, 226, .16); color: #fff; }
 
 .sidebar {
   position: fixed;
@@ -452,6 +479,11 @@
 .quick-card em { margin-top: auto; font-size: 12px; color: #1dd096; font-style: normal; }
 .dashboard-feature { min-height: 150px; padding: 18px 0; position: relative; }
 .dashboard-feature .section-heading { margin-top: 0; }
+.dashboard-carousel { position: relative; }
+.dashboard-arrow { position: absolute; top: 50%; z-index: 4; width: 48px; height: 54px; display: grid; place-items: center; transform: translateY(-50%); border: 0; background: rgba(2, 4, 9, .9); color: #fff; cursor: pointer; box-shadow: 0 10px 25px rgba(0, 0, 0, .34); }
+.dashboard-arrow:hover { background: #118de0; }
+.dashboard-arrow.previous { left: -15px; }
+.dashboard-arrow.next { right: -15px; }
 .watch-callout { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px 20px; border-radius: 15px; background: linear-gradient(100deg, rgba(63, 48, 90, .82), rgba(12, 82, 77, .35)); border: 1px solid rgba(119, 86, 180, .48); }
 .watch-callout-copy { display: flex; align-items: center; gap: 13px; }
 .watch-icon { width: 44px; height: 44px; border-radius: 11px; display: grid; place-items: center; background: #df373d; color: #fff; }
@@ -560,6 +592,8 @@
   .wallet-chip { min-width: 70px; height: 40px; padding: 0 12px; }
   .wallet-chip b { font-size: 15px; }
   .top-actions { gap: 6px; }
+  .top-popover { right: 7px; top: 61px; }
+  .account-popover { width: min(270px, calc(100vw - 14px)); }
   .hero-title { margin-bottom: 22px; }
   .hero-title h1 { font-size: 31px; }
   .hero-title p { font-size: 14px; }
@@ -572,6 +606,7 @@
   .tier-grid,
   .payment-grid { grid-template-columns: 1fr; }
   .offer-grid.mobile-peek { grid-template-columns: repeat(3, 170px); overflow-x: auto; padding-bottom: 8px; }
+  .dashboard-arrow { display: none; }
   .offer-card { min-height: 310px; }
   .toolbar { align-items: stretch; }
   .offer-controls { width: 100%; }

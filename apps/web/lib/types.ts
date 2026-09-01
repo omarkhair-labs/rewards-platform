@@ -71,6 +71,27 @@ export type Task = {
   expires_at?: string | null;
 };
 
+export type TaskSubmission = {
+  id: string | number;
+  task_id: string | number;
+  title: string;
+  category: string;
+  reward_points: string | number;
+  status: 'pending'|'in_review'|'approved'|'rejected';
+  submitted_at: string;
+  reviewed_at?: string | null;
+  review_note?: string | null;
+};
+
+export type Notification = {
+  id: string | number;
+  type: string;
+  title: string;
+  message: string;
+  created_at: string;
+  read_at?: string | null;
+};
+
 export type WithdrawalMethod = {
   id: string | number;
   method_key: string;

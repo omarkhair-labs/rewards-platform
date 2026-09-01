@@ -44,6 +44,10 @@ The implementation uses original code and branding while matching the requested 
 5. Run `npm install`.
 6. Run `npm run dev`.
 
+## Standalone frontend preview
+
+The complete member experience can be reviewed without the API by starting the web app with `NEXT_PUBLIC_DEMO_MODE=true`. Demo mode follows the same frontend contracts and simulates member data and mutations; set it to `false` and configure `NEXT_PUBLIC_API_URL` when handing the interface to another API team. See `docs/FRONTEND_API_HANDOFF.md` for the route contract map.
+
 ## Security rules
 
 - JWTs pin HS256, issuer and audience and every authenticated request re-checks the database account role/status.
