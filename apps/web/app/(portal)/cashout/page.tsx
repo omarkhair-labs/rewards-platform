@@ -103,8 +103,8 @@ export default function CashoutPage(){
 
   return <>
     <div className="cashout-hero">
-      <h1>Rewards Cashout</h1>
-      <p className="muted" style={{fontSize:8}}>Withdraw your available coins using an enabled payout method.</p>
+      <h1>💰 Rewards Cashout</h1>
+      <p className="muted" style={{fontSize:8}}>Withdraw any eligible amount using an enabled payout method and your own verified account details.</p>
       <div className="coin-display">💎 {formatPoints(balance)} Coins</div>
       {Number(debt)>0&&<div className="notice mt" style={{borderColor:'rgba(255,190,70,.4)',color:'#ffd47a'}}>Cashout is locked until {formatPoints(debt)} Coins of reversed-reward debt are settled by future earnings.</div>}
     </div>
@@ -114,13 +114,14 @@ export default function CashoutPage(){
     <div className="section-heading"><h2>Choose Payment Method</h2><span>{catalog.length} available</span></div>
     {catalog.length?<div className="payment-grid">
       {catalog.map(m=><button key={m.id} className="payment-card" onClick={()=>openMethod(m)}>
+        <span className="method-logo" aria-hidden="true">{m.name.slice(0,2).toUpperCase()}</span>
         <span>{m.name}</span>
         <small>{formatPoints(m.min_points)} min · {m.mode}</small>
       </button>)}
     </div>:<div className="panel center muted" style={{padding:30,fontSize:8}}>No payout methods are currently enabled.</div>}
 
     <div className="section-heading"><h2>Withdrawal History</h2><span>{withdrawals.length} requests</span></div>
-    <div className="panel">
+    <div className="panel table-wrap">
       <table className="table">
         <thead><tr><th>Method</th><th>Requested</th><th>Fee</th><th>Net</th><th>Status</th><th>Date</th><th>Reason</th></tr></thead>
         <tbody>{withdrawals.length?withdrawals.map(w=><tr key={w.id}><td>{w.method_key}</td><td>{formatPoints(w.points)}</td><td>{formatPoints(w.fee_points||0)}</td><td>{formatPoints(w.net_points??w.points)}</td><td><span className={'status-pill '+(w.status==='paid'?'available':'review')}>{w.status}</span></td><td>{new Date(w.requested_at).toLocaleDateString()}</td><td>{w.rejection_reason||'—'}</td></tr>):<tr><td colSpan={7} className="center muted" style={{padding:28}}>No withdrawals yet.</td></tr>}</tbody>
@@ -128,8 +129,8 @@ export default function CashoutPage(){
     </div>
 
     {method&&<div className="modal-backdrop" onClick={()=>setMethod(null)}>
-      <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={requestCashout}>
-        <h2>{method.name} cashout</h2>
+      <form className="modal" role="dialog" aria-modal="true" aria-labelledby="cashout-modal-title" onClick={e=>e.stopPropagation()} onSubmit={requestCashout}>
+        <h2 id="cashout-modal-title">{method.name} cashout</h2>
         {method.instructions&&<div className="notice">{method.instructions}</div>}
         <div className="form-grid mt">
           {normalizedFields(method).map(field=>{

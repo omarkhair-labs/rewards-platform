@@ -14,8 +14,7 @@ type WalletEntry={
   source_type:string;
   created_at:string;
   available_after:string|number;
-  debt_after?:string|number;
-  debt_delta?:string|number;
+  debt_after:string|number;
 };
 
 export default function ProfilePage(){
@@ -25,7 +24,6 @@ export default function ProfilePage(){
   const [withdrawals,setWithdrawals]=useState<Withdrawal[]>([]);
   const [levelProgress,setLevelProgress]=useState<LevelProgress|null>(null);
   const [tab,setTab]=useState<'earnings'|'withdrawals'>('earnings');
-  const [editing,setEditing]=useState(false);
   const [fullName,setFullName]=useState('');
   const [countryCode,setCountryCode]=useState('');
   const [bio,setBio]=useState('');
@@ -64,7 +62,6 @@ export default function ProfilePage(){
           bio:bio||undefined
         })
       });
-      setEditing(false);
       await load();
     }catch(err){setError(err instanceof Error?err.message:'Failed to update profile');}
     finally{setSaving(false);}
@@ -91,7 +88,9 @@ export default function ProfilePage(){
   return <>
     {error&&<div className="notice" style={{borderColor:'rgba(255,90,126,.4)',color:'#ff9bb5'}}>{error}</div>}
 
-    <div className="panel">
+    <section className="hero-title"><h1>Edit Profile</h1><p>Update your personal information, review account progress and manage your rewards history.</p></section>
+
+    <div className="panel profile-banner">
       <div className="profile-head">
         <div className="profile-avatar">{initial}</div>
         <div className="profile-meta">
@@ -99,9 +98,21 @@ export default function ProfilePage(){
           <p>@{username} · {me.country_code||'Country not set'}</p>
           <div className="level-row"><span className="level-badge">{(me.rank||'Bronze').toUpperCase()}</span><span className="level-badge" style={{background:'#57e6a1'}}>LEVEL {me.level||1}</span>{me.is_premium&&<span className="level-badge" style={{background:'#d98cff'}}>PREMIUM</span>}</div>
         </div>
-        <div style={{marginLeft:'auto'}}><button className="primary-button" onClick={()=>setEditing(true)}>Edit profile</button></div>
+        <div style={{marginLeft:'auto'}}><span className="status-pill available">Account active</span></div>
       </div>
     </div>
+
+    <form className="panel mt" onSubmit={save}>
+      <div className="profile-section-head"><div><h2>Personal Information</h2><p>Update your basic profile information and public member details.</p></div><span className="status-pill available">Editable</span></div>
+      <div className="profile-form-grid">
+        <div className="field"><label>Username</label><input value={username} readOnly aria-readonly="true"/></div>
+        <div className="field"><label>Email</label><input value={me.email} readOnly aria-readonly="true"/></div>
+        <div className="field"><label>Full name</label><input value={fullName} onChange={e=>setFullName(e.target.value)} maxLength={100} placeholder="Your name"/></div>
+        <div className="field"><label>Country code</label><input value={countryCode} onChange={e=>setCountryCode(e.target.value.toUpperCase())} maxLength={3} placeholder="EG"/></div>
+        <div className="field bio"><label>Bio</label><textarea value={bio} onChange={e=>setBio(e.target.value)} maxLength={500} placeholder="Tell the community a little about you"/></div>
+      </div>
+      <div className="modal-actions"><button disabled={saving} className="primary-button">{saving?'Saving...':'Update Profile'}</button></div>
+    </form>
 
     <div className="stats-grid mt">
       <div className="stat-card"><span>Earnings Overview</span><strong>{formatPoints(dashboard.wallet.lifetime_earned_points)} Coins</strong><em>Lifetime earnings</em></div>
@@ -118,13 +129,13 @@ export default function ProfilePage(){
       </>:<div className="notice">Highest rank reached.</div>}
     </div>}
 
-    <div className="panel mt">
+    <div className="panel mt table-wrap">
       <div className="section-heading"><h2>Earning Breakdown</h2><span>Live wallet data</span></div>
       <div className="stats-grid">
         <div className="stat-card"><span>Today</span><strong>{formatPoints(dashboard.earnings.today)}</strong></div>
         <div className="stat-card"><span>This Week</span><strong>{formatPoints(dashboard.earnings.week)}</strong></div>
         <div className="stat-card"><span>This Month</span><strong>{formatPoints(dashboard.earnings.month)}</strong></div>
-        <div className="stat-card"><span>Available</span><strong>{formatPoints(dashboard.wallet.available_points)}</strong></div>
+        <div className="stat-card"><span>Available</span><strong>{formatPoints(dashboard.wallet.available_points)}</strong><em>{Number(dashboard.wallet.debt_points||0)>0?formatPoints(dashboard.wallet.debt_points)+' debt':'No reward debt'}</em></div>
       </div>
     </div>
 
@@ -147,16 +158,5 @@ export default function ProfilePage(){
       </div>
     </div>
 
-    {editing&&<div className="modal-backdrop" onClick={()=>setEditing(false)}>
-      <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={save}>
-        <h2>Edit profile</h2>
-        <div className="form-grid">
-          <div className="field"><label>Full name</label><input value={fullName} onChange={e=>setFullName(e.target.value)} maxLength={100}/></div>
-          <div className="field"><label>Country code</label><input value={countryCode} onChange={e=>setCountryCode(e.target.value.toUpperCase())} maxLength={3}/></div>
-          <div className="field"><label>Bio</label><textarea value={bio} onChange={e=>setBio(e.target.value)} maxLength={500}/></div>
-        </div>
-        <div className="modal-actions"><button type="button" className="secondary-button" onClick={()=>setEditing(false)}>Cancel</button><button disabled={saving} className="primary-button">{saving?'Saving...':'Save profile'}</button></div>
-      </form>
-    </div>}
   </>;
 }
