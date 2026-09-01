@@ -1,0 +1,107 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: rewards
+      POSTGRES_USER: rewards
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - rewards_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rewards -d rewards"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://rewards:${POSTGRES_PASSWORD}@postgres:5432/rewards
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER:-rewards-api}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-rewards-web}
+      APP_ORIGIN: ${APP_ORIGIN}
+      PUBLIC_API_URL: ${PUBLIC_API_URL}
+      MIN_WITHDRAWAL_POINTS: ${MIN_WITHDRAWAL_POINTS:-5000}
+      MAX_SINGLE_REWARD_POINTS: ${MAX_SINGLE_REWARD_POINTS:-10000000}
+      REFERRAL_COMMISSION_BPS: ${REFERRAL_COMMISSION_BPS:-1000}
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-}
+      STORAGE_REGION: ${STORAGE_REGION:-auto}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-}
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-}
+      STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-}
+    command: ["sh","-c","node dist/migrate.js && node dist/server.js"]
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD","node","-e","fetch('http://127.0.0.1:4000/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+  admin-bootstrap:
+    profiles: ["ops"]
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://rewards:${POSTGRES_PASSWORD}@postgres:5432/rewards
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER:-rewards-api}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-rewards-web}
+      APP_ORIGIN: ${APP_ORIGIN}
+      PUBLIC_API_URL: ${PUBLIC_API_URL}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+    command: ["sh","-c","node dist/migrate.js && node dist/bootstrap-admin.js"]
+
+  demo-seed:
+    profiles: ["ops"]
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://rewards:${POSTGRES_PASSWORD}@postgres:5432/rewards
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER:-rewards-api}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-rewards-web}
+      APP_ORIGIN: ${APP_ORIGIN}
+      PUBLIC_API_URL: ${PUBLIC_API_URL}
+      DEMO_SEED_ENABLED: "true"
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD}
+    command: ["sh","-c","node dist/migrate.js && node dist/seed.js"]
+
+volumes:
+  rewards_postgres:
