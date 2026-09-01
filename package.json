@@ -10,6 +10,9 @@
     "build": "npm --workspace @rewards/api run build && npm --workspace @rewards/web run build",
     "start:api": "npm --workspace @rewards/api run start",
     "start:web": "npm --workspace @rewards/web run start",
-    "test": "npm --workspace @rewards/api run test"
+    "test": "npm --workspace @rewards/api run test",
+    "db:migrate": "npm --workspace @rewards/api run db:migrate",
+    "db:seed": "npm --workspace @rewards/api run db:seed",
+    "admin:bootstrap": "npm --workspace @rewards/api run admin:bootstrap"
   }
 }

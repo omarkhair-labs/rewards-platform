@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { env } from './config/env.js';
+import { pool } from './db.js';
 import { errorHandler } from './http.js';
 import authRoutes from './routes/auth.routes.js';
 import accountRoutes from './routes/account.routes.js';
@@ -29,6 +30,7 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
@@ -48,6 +50,14 @@ const postbackLimiter = rateLimit({
 app.use(apiLimiter);
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get('/ready', async (_req, res, next) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ ok: true, database: 'ready' });
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/account', accountRoutes);
