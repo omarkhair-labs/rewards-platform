@@ -5,6 +5,8 @@ The member portal can run in two modes without changing page components:
 - `NEXT_PUBLIC_DEMO_MODE=true`: a standalone interactive presentation using realistic in-browser data.
 - `NEXT_PUBLIC_DEMO_MODE=false`: requests are sent to `NEXT_PUBLIC_API_URL`.
 
+Demo mode is the safe default for unconfigured review deployments. The login page is prefilled with `demo@rewards.local` / `Demo2026!`; any valid email and password also work. Set the flag explicitly to `false` when the client API is available.
+
 All member pages call the shared `apiFetch()` adapter in `apps/web/lib/api.ts`. The company API can preserve the existing paths and JSON shapes, or replace that adapter with its own client while leaving the UI intact.
 
 ## Member contracts

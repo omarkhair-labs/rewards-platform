@@ -1,5 +1,7 @@
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/$/, '');
-export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+// The standalone review build should work without infrastructure. API teams opt
+// into live requests explicitly once their endpoint is ready.
+export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
 export type ApiErrorPayload = {
   error?: string;
