@@ -1,89 +1,88 @@
 # Rewards Platform
 
-Production-oriented foundation for a GPT / rewards platform with CovenCash-style workflows.
+Production-oriented GPT / rewards platform with CovenCash-style member workflows, original code and client-owned branding.
 
-## Current foundation
+## Current product
 
-- TypeScript + Express API
-- PostgreSQL canonical schema
-- Argon2id password hashing
-- JWT authentication
-- Immutable wallet ledger with available + held + reversal-debt balances
-- Idempotent wallet credit / debit / hold / release
-- Offers + provider abstraction
-- Signed provider postback foundation
-- Reward-event idempotency
-- Reward reversals
-- Referral commissions coupled to reward events
-- Task proof submission + admin moderation
-- Saved withdrawal methods
-- Withdrawal hold / settle / release lifecycle
-- Survey demographic profile
-- Watch & Earn sessions + member/admin campaign UI
-- Notifications
-- Admin users / offers / tasks / proofs / withdrawals / providers / watch campaigns / fraud / audit
-- S3-compatible proof file uploads
-- Database-backed payout method catalog with minimums, fees and account-field schemas
-- Automatic level/rank progression
-- Time-bounded or lifetime premium grants
+- Dashboard → Offers → Surveys → Tasks → Affiliates → Cashout → Profile
+- Operations admin console
+- PostgreSQL wallet ledger with available, held and reversal-debt balances
+- Signed and idempotent reward callbacks
+- Referral commissions and reversals
+- Task proof moderation
+- Watch & Earn
+- Dynamic payout catalog and withdrawal state machine
+- Levels, ranks and premium
+- S3-compatible proof uploads
+- Security/integrity integration suite
+- Blacksmith CI
+- Container production configuration
+- Tracked SQL migration runner
+- Explicit first-admin bootstrap
+- Opt-in idempotent demo seed
 
-## Product target
+## Local setup
 
-The customer-facing UX will be implemented to match the supplied CovenCash reference flow:
+1. Create PostgreSQL and copy `apps/api/.env.example` to `apps/api/.env`.
+2. Set `DATABASE_URL`, `JWT_SECRET`, `APP_ORIGIN` and `PUBLIC_API_URL`.
+3. Install dependencies:
 
-Dashboard → Offers → Surveys → Tasks → Affiliates → Cashout → Profile
+```bash
+npm install
+```
 
-The implementation uses original code and branding while matching the requested product behavior and information architecture.
+4. Apply all migrations:
 
-## Run locally
+```bash
+npm run db:migrate
+```
 
-1. Create a PostgreSQL database.
-2. Apply `apps/api/migrations/001_core.sql`.
-3. Copy `apps/api/.env.example` to `apps/api/.env`.
-4. Set a strong `JWT_SECRET`.
-5. Run `npm install`.
-6. Run `npm run dev`.
+5. Start the API and web in separate terminals:
+
+```bash
+npm run dev:api
+npm run dev:web
+```
 
 ## Standalone frontend preview
 
 The complete member experience can be reviewed without the API by starting the web app with `NEXT_PUBLIC_DEMO_MODE=true`. Demo mode follows the same frontend contracts and simulates member data and mutations; set it to `false` and configure `NEXT_PUBLIC_API_URL` when handing the interface to another API team. See `docs/FRONTEND_API_HANDOFF.md` for the route contract map.
 
-## Security rules
+## Demo and first admin
 
-- JWTs pin HS256, issuer and audience and every authenticated request re-checks the database account role/status.
-- Login and registration have dedicated throttles; targeted failed logins create fraud events.
-- Official and generic provider callbacks are rate-limited and cannot credit without signature verification.
-- Generic callback signatures bind transaction, user, reward amount **and status**, preventing a signed credit from being replayed as a reversal.
-- Every wallet mutation is idempotent and recorded in `wallet_entries`.
-- Chargebacks can create explicit wallet debt instead of failing when a reward was already spent; cashout is locked until that debt is settled by later credits or released held funds.
-- Cashout reserves balance before operator processing and uses a strict pending → review → processing → paid lifecycle.
-- Paid withdrawals require an operator payment reference; reject/fail transitions require a reason.
-- Moderators can work review queues, but financial/configuration mutations are admin-only.
-- Task rewards are credited only after moderation approval and active duplicate submissions are database-constrained.
-- Configurable outbound URLs are restricted to HTTP(S).
-- Admin actions are audit logged with BigInt-safe serialization and provider secrets redacted from audit metadata.
+First admin:
 
-## Next build lanes
+```bash
+npm run admin:bootstrap
+```
 
-1. Demo/seed environment and admin bootstrap.
-2. Production deployment configuration.
-3. Automated payout adapters where provider credentials exist.
-4. CovenCash parity QA screen-by-screen.
-5. Production smoke/E2E pass against the deployed environment.
+Demo data is opt-in and requires `DEMO_SEED_ENABLED=true` plus a strong `DEMO_USER_PASSWORD`:
 
+```bash
+npm run db:seed
+```
 
-## Proof file storage
+See `docs/PRODUCTION.md` for production variables, containers, health checks, provider activation and final smoke paths.
 
-File proof tasks use an S3-compatible object store (Cloudflare R2, S3, MinIO, etc.). Configure the STORAGE_* variables from `apps/api/.env.example`. Files are uploaded directly from the browser using a five-minute signed PUT URL and task submissions only accept file URLs under that user's proof storage prefix.
+## Security invariants
 
+- JWT HS256 with issuer/audience validation and live account role/status checks.
+- Dedicated authentication throttles and fraud signals.
+- Signed provider callbacks bind transaction, user, reward and status.
+- Wallet mutations are idempotent and ledgered.
+- Reversals can create explicit debt when points were already spent.
+- Cashout is locked while reward debt exists.
+- Withdrawals reserve balance before processing and require valid state transitions.
+- Paid withdrawals require a payment reference.
+- Moderators review queues; financial/configuration mutations are admin-only.
+- Active duplicate task submissions are database constrained.
+- Configurable outbound URLs require HTTP(S).
+- Provider secrets are redacted from audit metadata.
 
-## Payout catalog
+## Verification
 
-Cashout methods are no longer hardcoded in the web UI. Enabled methods are stored in `payout_method_catalog`, including account field requirements, minimum points, fee basis points, operator/API mode and ordering. Each withdrawal snapshots its fee and net points so later catalog changes cannot rewrite historical payout economics.
+`npm test` runs PostgreSQL-backed security/integrity tests. CI additionally verifies migrations twice, admin bootstrap, demo seeding, API/web production builds and both Docker images.
 
+## Remaining go-live work
 
-## Integration tests
-
-`npm test` runs the API security/integrity suite against PostgreSQL. The suite rebuilds an isolated test schema and covers JWT claims/RBAC, task proof credit idempotency, repeatable tasks, withdrawal state transitions and balance holds, signed provider credit/reversal behavior, reversal debt, oversized rewards, concurrent Watch & Earn completion, unsafe outbound URLs and fraud-event logging.
-
-The CI workflow provisions PostgreSQL 16, audits production dependencies, builds API + web, then runs the integration suite.
+The codebase is production-ready at the infrastructure/configuration level. Real go-live still requires client-owned provider credentials, payout credentials where automation is requested, production domains/object storage, and a final deployed E2E smoke pass.

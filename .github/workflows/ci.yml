@@ -44,5 +44,24 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Build API and web
         run: npm run build
+      - name: Verify tracked migrations are idempotent
+        run: |
+          npm run db:migrate
+          npm run db:migrate
+      - name: Verify admin bootstrap
+        env:
+          BOOTSTRAP_ADMIN_EMAIL: admin-ci@example.test
+          BOOTSTRAP_ADMIN_USERNAME: admin-ci
+          BOOTSTRAP_ADMIN_PASSWORD: ci-admin-password-12345
+        run: npm run admin:bootstrap
+      - name: Verify demo seed
+        env:
+          DEMO_SEED_ENABLED: "true"
+          DEMO_USER_PASSWORD: ci-demo-password-12345
+        run: npm run db:seed
       - name: Run integration tests
         run: npm test
+      - name: Build production API image
+        run: docker build -f Dockerfile.api -t rewards-api:ci .
+      - name: Build production web image
+        run: docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:4000 -f Dockerfile.web -t rewards-web:ci .
