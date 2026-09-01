@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch, getToken, setToken } from '@/lib/api';
+import { apiFetch, DEMO_MODE, getToken, setToken } from '@/lib/api';
 
 type LoginResponse = {
   token: string;
@@ -12,8 +12,8 @@ type LoginResponse = {
 
 export default function LoginPage(){
   const router = useRouter();
-  const [email,setEmail]=useState('');
-  const [password,setPassword]=useState('');
+  const [email,setEmail]=useState(DEMO_MODE?'demo@rewards.local':'');
+  const [password,setPassword]=useState(DEMO_MODE?'Demo2026!':'');
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(false);
 
@@ -44,6 +44,7 @@ export default function LoginPage(){
     <form className="panel form-card" style={{width:'min(430px,94vw)'}} onSubmit={submit}>
       <div className="center"><div className="brand-mark" style={{margin:'0 auto 10px'}}>R</div><h1 style={{fontSize:18,marginBottom:4}}>Welcome back</h1><p className="muted" style={{fontSize:8}}>Sign in to continue to your rewards account.</p></div>
       {error&&<div className="notice" style={{borderColor:'rgba(255,90,126,.4)',background:'rgba(120,20,55,.16)',color:'#ff9bb5'}}>{error}</div>}
+      {DEMO_MODE&&<div className="notice">Interactive preview is active. Sign in with demo@rewards.local / Demo2026! (or any valid email and password).</div>}
       <div className="form-grid mt">
         <div className="field"><label>Email</label><input required type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email"/></div>
         <div className="field"><label>Password</label><input required type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password"/></div>

@@ -30,6 +30,7 @@ export default function ProfilePage(){
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
+  const [success,setSuccess]=useState('');
 
   const load=useCallback(async()=>{
     setError('');
@@ -52,7 +53,7 @@ export default function ProfilePage(){
   useEffect(()=>{void load();},[load]);
 
   async function save(e:FormEvent){
-    e.preventDefault();setSaving(true);setError('');
+    e.preventDefault();setSaving(true);setError('');setSuccess('');
     try{
       await apiFetch('/api/account/profile',{
         method:'PATCH',
@@ -63,6 +64,7 @@ export default function ProfilePage(){
         })
       });
       await load();
+      setSuccess('Profile updated successfully.');
     }catch(err){setError(err instanceof Error?err.message:'Failed to update profile');}
     finally{setSaving(false);}
   }
@@ -87,6 +89,7 @@ export default function ProfilePage(){
 
   return <>
     {error&&<div className="notice" style={{borderColor:'rgba(255,90,126,.4)',color:'#ff9bb5'}}>{error}</div>}
+    {success&&<div className="notice">{success}</div>}
 
     <section className="hero-title"><h1>Edit Profile</h1><p>Update your personal information, review account progress and manage your rewards history.</p></section>
 
@@ -139,7 +142,7 @@ export default function ProfilePage(){
       </div>
     </div>
 
-    <div className="panel mt">
+    <div className="panel mt table-wrap">
       <div className="filters"><button className={'filter '+(tab==='earnings'?'active':'')} onClick={()=>setTab('earnings')}>Earnings</button><button className={'filter '+(tab==='withdrawals'?'active':'')} onClick={()=>setTab('withdrawals')}>Withdrawals</button></div>
       {tab==='earnings'?<table className="table">
         <thead><tr><th>Source</th><th>Direction</th><th>Points</th><th>Balance after</th><th>Debt after</th><th>Date</th></tr></thead>

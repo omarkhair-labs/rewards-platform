@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowRight, CircleDollarSign, ListTodo, Play, RefreshCw, Sparkles, UserRound } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, CircleDollarSign, ListTodo, Play, RefreshCw, Sparkles, UserRound } from 'lucide-react';
 import { apiFetch, formatPoints } from '@/lib/api';
 import type { Dashboard, Me, Offer } from '@/lib/types';
 import { ErrorPanel, LoadingPanel } from '@/components/LoadingPanel';
@@ -14,6 +14,7 @@ export default function DashboardPage(){
   const [offers,setOffers]=useState<Offer[]>([]);
   const [error,setError]=useState('');
   const [refreshing,setRefreshing]=useState(false);
+  const [featuredPage,setFeaturedPage]=useState(0);
 
   const load=useCallback(async()=>{
     setError('');
@@ -39,6 +40,9 @@ export default function DashboardPage(){
   if(error&&!data) return <ErrorPanel message={error} retry={()=>void load()}/>;
   if(!data) return <LoadingPanel label="Loading dashboard..." />;
 
+  const featuredPages=Math.max(1,Math.ceil(offers.length/4));
+  const visibleFeatured=offers.slice(featuredPage*4,featuredPage*4+4);
+
   return <>
     <section className="hero-title">
       <h1>Welcome back, {me?.username || 'Member'}!</h1>
@@ -57,7 +61,11 @@ export default function DashboardPage(){
         <button className="primary-button" disabled={refreshing} onClick={()=>void load()}><RefreshCw size={16}/>{refreshing?'Refreshing':'Refresh Offers'}</button>
       </div>
       {offers.length
-        ? <div className="offer-grid mobile-peek">{offers.slice(0,4).map(offer=><OfferTile key={offer.id} offer={offer} featured href="/offers" actionLabel="Open Wall"/>)}</div>
+        ? <div className="dashboard-carousel">
+            <button className="dashboard-arrow previous" aria-label="Previous featured offers" onClick={()=>setFeaturedPage(page=>(page-1+featuredPages)%featuredPages)}><ChevronLeft size={33}/></button>
+            <div className="offer-grid mobile-peek">{visibleFeatured.map(offer=><OfferTile key={offer.id} offer={offer} featured href="/offers" actionLabel="Open Wall"/>)}</div>
+            <button className="dashboard-arrow next" aria-label="Next featured offers" onClick={()=>setFeaturedPage(page=>(page+1)%featuredPages)}><ChevronRight size={33}/></button>
+          </div>
         : <div className="panel empty-state"><b>No featured offers right now</b><span>Enabled provider opportunities will appear here automatically.</span></div>}
     </section>
 

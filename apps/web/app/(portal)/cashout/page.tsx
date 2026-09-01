@@ -22,6 +22,7 @@ export default function CashoutPage(){
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(true);
   const [submitting,setSubmitting]=useState(false);
+  const [success,setSuccess]=useState('');
 
   const load=useCallback(async()=>{
     setError('');
@@ -56,7 +57,7 @@ export default function CashoutPage(){
     const amount=points.trim();
     if(!amount||BigInt(amount)<=0n){setError('Enter a valid coin amount');return;}
 
-    setSubmitting(true);setError('');
+    setSubmitting(true);setError('');setSuccess('');
     try{
       const requiredFields=normalizedFields(method).filter(f=>f.required!==false);
       for(const field of requiredFields){
@@ -91,6 +92,7 @@ export default function CashoutPage(){
 
       setMethod(null);setAccountDetails({});setPoints('');
       await load();
+      setSuccess('Cashout request created. Your balance is reserved while it is reviewed.');
     }catch(err){setError(err instanceof Error?err.message:'Unable to request cashout');}
     finally{setSubmitting(false);}
   }
@@ -110,6 +112,7 @@ export default function CashoutPage(){
     </div>
 
     {error&&<div className="notice" style={{borderColor:'rgba(255,90,126,.4)',color:'#ff9bb5'}}>{error}</div>}
+    {success&&<div className="notice">{success}</div>}
 
     <div className="section-heading"><h2>Choose Payment Method</h2><span>{catalog.length} available</span></div>
     {catalog.length?<div className="payment-grid">
